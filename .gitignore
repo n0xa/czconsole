@@ -1,0 +1,10 @@
+# build artifacts
+/czconsole
+/czconsole-*
+/dist/
+*.test
+
+# editor / OS
+*.swp
+*~
+.DS_Store

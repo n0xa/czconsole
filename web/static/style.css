@@ -1,0 +1,85 @@
+:root{
+  --bg:#0a0e0a; --panel:#0f140f; --panel2:#131a13; --line:#1c2a1c;
+  --fg:#d6f5d3; --dim:#5f7a5d; --accent:#00ff66; --accent2:#23c552;
+  --lock:#7da7ff; --warn:#ffd23d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+     font:14px/1.45 ui-monospace,Menlo,Consolas,monospace;
+     max-width:520px;margin-inline:auto}
+
+.appbar{display:flex;align-items:center;gap:10px;padding:12px 14px;
+        border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+.appbar h1{font-size:15px;margin:0;letter-spacing:1px;color:var(--accent);flex:1}
+.pill{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.pill.ok{color:var(--accent2);border-color:#1c3a1c}
+.pill.gps{color:var(--lock);border-color:#1c2a3a}
+.pill.warn{color:var(--warn);border-color:#3a341c}
+
+.wrap{padding:14px;display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h2{margin:0 0 10px;font-size:12px;letter-spacing:1px;color:var(--dim);
+         text-transform:uppercase;font-weight:600}
+.dim{color:var(--dim)}
+
+.glance{display:flex;gap:8px}
+.glance .g{flex:1;background:var(--panel);border:1px solid var(--line);
+           border-radius:12px;padding:8px;text-align:center}
+.glance .g .n{font-size:16px;color:#eafff2}
+.glance .g .l{font-size:9px;color:var(--dim);letter-spacing:.5px;margin-top:3px}
+
+.rows{display:grid;gap:6px;font-size:13px}
+.rows .r{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rows .sub{color:var(--dim)}
+.rows .cap{font-size:11px}
+.rows .cap.mon{color:var(--accent2)}     /* monitor-capable: passive */
+.rows .cap.inj{color:#ff8a5a}            /* injection-capable: active/offensive */
+.rows .st{font-size:12px;color:var(--dim);white-space:nowrap}
+.rows .st.ok{color:var(--accent2)}
+.rows .st.warn{color:var(--warn)}
+
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+      padding:14px;min-height:92px;position:relative;text-decoration:none;color:inherit;display:block}
+.tile .ic{font-size:20px}
+.tile .nm{margin-top:8px;font-size:14px;color:var(--fg)}
+.tile .ds{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.3}
+.tile.off{opacity:.5}
+.tile .tag{position:absolute;top:10px;right:10px;font-size:10px}
+.tile .tag.live{color:var(--accent2)}
+.tile .tag.need{color:var(--dim)}
+
+/* The LCD is natively 320x170. Render at native size (crisp, no upscale),
+   centered; only scale DOWN on phones narrower than 320 CSS px. aspect-ratio
+   locks the box so it doesn't jump/distort while the frame loads. */
+.mirror img{display:block;width:320px;max-width:100%;height:auto;
+            aspect-ratio:320 / 170;margin-inline:auto;
+            border-radius:6px;border:1px solid var(--line);
+            background:#020402;image-rendering:pixelated}
+.mirror img[src=""],.mirror img:not([src]){display:none}
+
+footer{padding:4px 2px 24px;font-size:11px;text-align:center}
+
+/* clickable affordances */
+#gps{cursor:pointer}
+.rows .r[data-adapter]{cursor:pointer}
+
+/* bottom-sheet modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
+               display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.modal-overlay[hidden]{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px 16px 0 0;
+       width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:16px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.modal-head span{color:var(--accent);letter-spacing:1px;font-size:14px}
+.modal-head button{background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;
+    border-bottom:1px dotted var(--line);font-size:13px}
+.kv .k{color:var(--dim);white-space:nowrap}
+.kv span:last-child{text-align:right;word-break:break-all}
+.sat-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.sat-tbl th{color:var(--dim);text-align:right;font-weight:600;padding:3px 5px;font-size:10px;letter-spacing:.5px}
+.sat-tbl td{text-align:right;padding:3px 5px;border-top:1px dotted var(--line)}
+.sat-tbl td.used{color:var(--accent2);font-weight:700}
+.snrbar{height:8px;background:var(--accent2);border-radius:2px;display:inline-block;min-width:1px}

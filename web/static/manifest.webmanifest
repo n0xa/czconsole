@@ -1,0 +1,13 @@
+{
+  "name": "CZ Field Console",
+  "short_name": "CZ Console",
+  "description": "Field console for the M5 Cardputer Zero",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0e0a",
+  "theme_color": "#0a0e0a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

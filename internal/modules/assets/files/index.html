@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e0a">
+<link rel="stylesheet" href="/style.css">
+<title>Files — CZ Field Console</title>
+<style>
+  .crumbs{font-size:12px;color:var(--dim);word-break:break-all;margin-bottom:4px}
+  .crumbs a{color:var(--accent2);text-decoration:none}
+  .flist{display:grid;gap:1px}
+  .frow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dotted var(--line);
+        text-decoration:none;color:inherit;cursor:pointer}
+  .frow .ic{width:18px;text-align:center}
+  .frow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .meta{font-size:11px;color:var(--dim);white-space:nowrap}
+  .frow.file{cursor:default}
+  .frow .open{flex:1;display:flex;align-items:center;gap:10px;min-width:0;
+              text-decoration:none;color:inherit}
+  .frow .dl{color:var(--dim);text-decoration:none;padding:0 6px;font-size:15px}
+  .frow .dl:hover{color:var(--accent2)}
+  .frow.dir .nm{color:var(--fg)}
+  .frow.up .nm{color:var(--dim)}
+  .uploadbar{display:flex;gap:10px;align-items:center;margin-top:4px}
+  .uploadbar input[type=file]{flex:1;font:12px ui-monospace,monospace;color:var(--dim)}
+  .uploadbar button{padding:9px 14px;border:none;border-radius:10px;font-family:inherit;font-weight:700;
+                    background:#0b3018;color:#39ff8a;box-shadow:0 0 0 1px #195e33 inset}
+  .msg{font-size:12px;color:var(--accent2);min-height:16px}
+  .msg.err{color:#ff5a5a}
+</style>
+</head>
+<body>
+  <header class="appbar">
+    <a class="back" href="/" style="color:var(--dim);text-decoration:none;font-size:18px">‹</a>
+    <h1>FILES</h1>
+    <span id="root" class="pill">~</span>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <div id="crumbs" class="crumbs">/</div>
+      <div id="flist" class="flist">loading…</div>
+    </section>
+
+    <section class="card">
+      <h2>Upload here</h2>
+      <form id="up" class="uploadbar">
+        <input id="file" type="file" multiple>
+        <button type="submit">⬆ Upload</button>
+      </form>
+      <div id="msg" class="msg"></div>
+    </section>
+  </main>
+
+  <script src="files.js"></script>
+</body>
+</html>

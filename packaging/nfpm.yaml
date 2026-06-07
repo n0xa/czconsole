@@ -1,0 +1,63 @@
+# nfpm config for the czconsole .deb.
+#
+# Build the (pure-Go) binary, then package:
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole ./cmd/czconsole
+#   nfpm package --packager deb --config packaging/nfpm.yaml --target dist/
+#
+# The package Depends on pamtester so the PAM login layer works the moment it's
+# installed — no manual step. pamtester is in kali-rolling/main and Debian
+# trixie/main (same 0.1.2-4), so this resolves on both the Kali graft and
+# stock Raspberry Pi OS.
+name: czconsole
+arch: arm64
+platform: linux
+version: ${CZCONSOLE_VERSION}
+version_schema: none
+section: utils
+priority: optional
+maintainer: n0xa <noxa@example.com>
+description: |
+  Cardputer Zero field console.
+  A phone-friendly web dashboard served by the CZ itself: telemetry, LCD mirror,
+  files, and pluggable modules (wardrive, …). Privilege-separated — a powerless
+  web worker, a files agent that runs as the operator, and a root PAM auth agent.
+vendor: n0xa
+homepage: https://github.com/n0xa/czconsole
+license: MIT
+
+depends:
+  - pamtester        # PAM login (the auth agent execs it)
+  - libpam-modules   # pam_unix / pam_faillock / pam_deny (essential, but explicit)
+
+contents:
+  - src: ./czconsole
+    dst: /usr/local/bin/czconsole
+    file_info:
+      mode: 0755
+
+  - src: ./packaging/czconsole.service
+    dst: /etc/systemd/system/czconsole.service
+  - src: ./packaging/czconsole-files.service
+    dst: /etc/systemd/system/czconsole-files.service
+  - src: ./packaging/czconsole-auth.service
+    dst: /etc/systemd/system/czconsole-auth.service
+  - src: ./packaging/czconsole-kismet@.service
+    dst: /etc/systemd/system/czconsole-kismet@.service
+
+  - src: ./packaging/50-czconsole-kismet.rules
+    dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
+  - src: ./packaging/tmpfiles-czconsole.conf
+    dst: /usr/lib/tmpfiles.d/czconsole.conf
+
+  # Conffiles: preserve site edits across upgrades.
+  - src: ./packaging/pam/czconsole
+    dst: /etc/pam.d/czconsole
+    type: config|noreplace
+  - src: ./packaging/czconsole.conf
+    dst: /etc/czconsole/czconsole.conf
+    type: config|noreplace
+
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
+  postremove: ./packaging/scripts/postremove.sh

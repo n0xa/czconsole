@@ -1,0 +1,33 @@
+[Unit]
+Description=czconsole wardrive capture (kismet) on %i
+Documentation=https://github.com/n0xa/czconsole
+After=gpsd.service
+# Instantiated per-interface by the wardrive module via polkit-authorized
+# `systemctl start czconsole-kismet@<iface>`. kismet's privileged needs
+# (CAP_NET_ADMIN/RAW, netlink, packet sockets) live HERE — scoped to this
+# single-purpose unit — so the network-facing web worker never holds them.
+
+[Service]
+Type=simple
+User=_czconsole
+SupplementaryGroups=kismet plugdev netdev
+Environment=HOME=/var/lib/czconsole/wardrive
+ExecStart=/usr/bin/kismet --no-ncurses -s --homedir /var/lib/czconsole/wardrive -c %i -p /var/lib/czconsole/wardrive/logs
+Restart=no
+
+# Scoped privileges kismet requires (and nothing else).
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK AF_PACKET
+NoNewPrivileges=no
+
+# Still hardened where it can be.
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/czconsole
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

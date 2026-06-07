@@ -1,0 +1,42 @@
+[Unit]
+Description=Cardputer Zero Field Console (PAM auth agent)
+Documentation=https://github.com/n0xa/czconsole
+PartOf=czconsole.service
+Before=czconsole.service
+
+[Service]
+Type=simple
+# The privileged half of the login split: the ONLY czconsole process that runs
+# with privilege and the only one that can read /etc/shadow. It does nothing but
+# accept {user,password} on a unix socket and run `pamtester` — it never parses
+# the network or anything richer. See the privsep section in the README.
+User=root
+ExecStart=/usr/local/bin/czconsole --auth-agent --auth-sock /run/czconsole/auth.sock --pam-service czconsole
+Restart=on-failure
+RestartSec=2
+
+# Hardened root: it needs to read shadow, exec pamtester, and let pam_faillock
+# write its tally — nothing else. Capabilities are pared to that set; the rest
+# of the usual systemd sandboxing applies. (Missing faillock paths are optional
+# via the '-' prefix; they differ across distros.)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/run/czconsole -/run/faillock -/var/lib/faillock
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+# CAP_DAC_OVERRIDE: bind the socket in the worker-owned /run/czconsole dir and
+# chgrp it; CAP_CHOWN: hand the socket to the czconsole group; SETUID/SETGID +
+# AUDIT_WRITE: pam_unix/pam_faillock; DAC_READ_SEARCH/FOWNER: shadow + tally.
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wardrive — phone companion mockup</title>
+<style>
+  :root{
+    --bg:#0a0e0a; --panel:#0f140f; --panel2:#131a13; --line:#1c2a1c;
+    --fg:#d6f5d3; --dim:#5f7a5d; --accent:#00ff66; --accent2:#23c552;
+    --danger:#ff5a5a; --warn:#ffd23d; --lock:#7da7ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#15171a;color:var(--fg);
+       font:14px/1.45 ui-monospace,Menlo,Consolas,monospace;
+       display:flex;gap:40px;flex-wrap:wrap;padding:40px;align-items:flex-start}
+  .cap{color:#8a93a0;font-size:12px;margin-bottom:10px}
+  .cap b{color:#cdd6e0}
+
+  .phone{width:390px;background:var(--bg);border-radius:34px;border:1px solid #222;
+         overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .notch{height:26px;background:#000;border-radius:0 0 16px 16px;width:160px;margin:0 auto}
+
+  .appbar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .appbar .back{color:var(--dim);font-size:18px}
+  .appbar h1{font-size:15px;margin:0;letter-spacing:1px;color:var(--accent);flex:1}
+  .pill{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
+  .pill.ok{color:var(--accent2);border-color:#1c3a1c}
+  .pill.gps{color:var(--lock);border-color:#1c2a3a}
+
+  .wrap{padding:14px;display:grid;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card h2{margin:0 0 10px;font-size:12px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;font-weight:600}
+
+  .statusrow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .badge{font-size:11px;font-weight:700;letter-spacing:1px;padding:3px 9px;border-radius:8px}
+  .badge.run{background:#0b3018;color:#39ff8a;box-shadow:0 0 0 1px #195e33 inset}
+  .timer{color:var(--dim);font-size:12px;margin-left:auto}
+
+  .counts{display:flex;gap:8px}
+  .count{flex:1;text-align:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 4px}
+  .count .n{font-size:30px;line-height:1;color:#eafff2;font-weight:700}
+  .count .l{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:5px}
+  .count.delta .n{color:var(--accent)}
+
+  .map{height:150px;border-radius:12px;border:1px solid var(--line);position:relative;overflow:hidden;
+       background:
+        radial-gradient(circle at 30% 40%, #12351f 0 2px, transparent 3px),
+        radial-gradient(circle at 62% 30%, #123a22 0 2px, transparent 3px),
+        radial-gradient(circle at 48% 62%, #1c5234 0 3px, transparent 4px),
+        radial-gradient(circle at 72% 68%, #123a22 0 2px, transparent 3px),
+        radial-gradient(circle at 20% 70%, #123a22 0 2px, transparent 3px),
+        linear-gradient(#0c130c,#0c130c)}
+  .map .me{position:absolute;left:48%;top:60%;width:10px;height:10px;border-radius:50%;
+           background:var(--accent);box-shadow:0 0 0 4px rgba(0,255,102,.18)}
+  .map .live{position:absolute;top:8px;right:8px;font-size:10px;color:var(--accent2);
+             background:#06140a;border:1px solid #1c3a1c;border-radius:8px;padding:2px 7px}
+  .map .trail{position:absolute;left:18%;top:74%;width:42%;height:1px;background:linear-gradient(90deg,transparent,#1c5234);transform:rotate(-18deg)}
+
+  .controls{display:flex;gap:10px;align-items:center}
+  .btn{flex:1;text-align:center;padding:13px;border-radius:12px;font-weight:700;letter-spacing:1px;border:none;font-family:inherit;font-size:14px}
+  .btn.stop{background:#2a0d0d;color:var(--danger);box-shadow:0 0 0 1px #5e1919 inset}
+  .btn.start{background:#0b3018;color:#39ff8a;box-shadow:0 0 0 1px #195e33 inset}
+  .chip{font-size:11px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px;white-space:nowrap}
+  .chip b{color:var(--fg)}
+
+  .feed{display:grid;gap:1px}
+  .ssid{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dotted var(--line)}
+  .ssid .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ssid .nm.hidden{color:var(--dim);font-style:italic}
+  .ssid .lock{font-size:11px}
+  .ssid .lock.open{color:var(--warn)}
+  .ssid .lock.wpa{color:var(--lock)}
+  .ssid .rssi{font-size:11px;color:var(--dim);width:48px;text-align:right}
+  .bars{display:inline-flex;gap:1px;align-items:flex-end;height:12px;width:16px}
+  .bars i{width:3px;background:var(--accent2);opacity:.3}
+  .bars i.on{opacity:1}
+
+  .export{display:flex;gap:10px}
+  .export .btn{background:var(--panel2);color:var(--fg);box-shadow:0 0 0 1px var(--line) inset;font-weight:600;letter-spacing:.5px;font-size:13px}
+
+  /* dashboard tiles */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-height:96px;position:relative}
+  .tile .ic{font-size:20px}
+  .tile .nm{margin-top:8px;font-size:14px;color:var(--fg)}
+  .tile .ds{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.3}
+  .tile.live::after{content:"● live";position:absolute;top:10px;right:10px;font-size:10px;color:var(--accent2)}
+  .tile.off{opacity:.5}
+  .tile.off::after{content:"needs tool";position:absolute;top:10px;right:10px;font-size:10px;color:var(--dim)}
+  .glance{display:flex;gap:8px;margin-bottom:12px}
+  .glance .g{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+  .glance .g .n{font-size:16px;color:#eafff2}
+  .glance .g .l{font-size:9px;color:var(--dim);letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<!-- ============ DASHBOARD ============ -->
+<div>
+  <div class="cap"><b>Home / Dashboard</b> — what you see when you open the URL</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="appbar">
+      <h1>CZ FIELD CONSOLE</h1>
+      <span class="pill gps">GPS 3D</span>
+      <span class="pill ok">78%</span>
+    </div>
+    <div class="wrap">
+      <div class="glance">
+        <div class="g"><div class="n">m5cz</div><div class="l">HOST</div></div>
+        <div class="g"><div class="n">39°C</div><div class="l">TEMP</div></div>
+        <div class="g"><div class="n">181</div><div class="l">MB FREE</div></div>
+        <div class="g"><div class="n">0.14</div><div class="l">LOAD</div></div>
+      </div>
+
+      <div class="card" style="padding:12px">
+        <h2>Adapters</h2>
+        <div style="display:grid;gap:6px;font-size:13px">
+          <div style="display:flex;justify-content:space-between"><span>wlan0 <span style="color:var(--dim)">onboard</span></span><span class="pill ok">↑ home-net</span></div>
+          <div style="display:flex;justify-content:space-between"><span>wlan1 <span style="color:var(--dim)">mt7921u</span></span><span class="pill ok">monitor</span></div>
+          <div style="display:flex;justify-content:space-between"><span>rtl0 <span style="color:var(--dim)">RTL2832U</span></span><span class="pill">idle</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:12px">
+        <h2>Modules</h2>
+        <div class="tiles">
+          <div class="tile live"><div class="ic">📡</div><div class="nm">Wardrive</div><div class="ds">Kismet + GPS survey</div></div>
+          <div class="tile"><div class="ic">〰️</div><div class="nm">SDR Sweep</div><div class="ds">rtl_power + 433</div></div>
+          <div class="tile"><div class="ic">✛</div><div class="nm">Net Recon</div><div class="ds">nmap discovery</div></div>
+          <div class="tile"><div class="ic">📁</div><div class="nm">Files</div><div class="ds">Browse &amp; upload ~/</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:12px;display:flex;justify-content:space-between;align-items:center">
+        <span><span style="color:var(--dim)">LCD mirror</span> &nbsp;▸ tap to view</span>
+        <div style="width:84px;height:44px;border-radius:6px;border:1px solid var(--line);background:#020402"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ WARDRIVE DETAIL ============ -->
+<div>
+  <div class="cap"><b>Wardrive</b> — module detail (running)</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="appbar">
+      <span class="back">‹</span>
+      <h1>WARDRIVE</h1>
+      <span class="pill gps">3D · 9 sat</span>
+      <span class="pill ok">78%</span>
+    </div>
+    <div class="wrap">
+
+      <div class="card">
+        <div class="statusrow">
+          <span class="badge run">● RECORDING</span>
+          <span class="timer">session 00:14:22 · 1.8 mi</span>
+        </div>
+        <div class="counts">
+          <div class="count"><div class="n">142</div><div class="l">APs</div></div>
+          <div class="count"><div class="n">318</div><div class="l">CLIENTS</div></div>
+          <div class="count delta"><div class="n">12</div><div class="l">NEW/MIN</div></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn stop">STOP</button>
+        <span class="chip">iface <b>wlan1</b></span>
+        <span class="chip">CH <b>6</b> ↻</span>
+      </div>
+
+      <div class="card">
+        <h2>Live feed</h2>
+        <div class="feed">
+          <div class="ssid"><span class="nm">Starbucks-WiFi</span><span class="lock wpa">🔒</span><span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="rssi">-67</span></div>
+          <div class="ssid"><span class="nm">xfinitywifi</span><span class="lock open">○</span><span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span><span class="rssi">-74</span></div>
+          <div class="ssid"><span class="nm hidden">&lt;hidden&gt;</span><span class="lock wpa">🔒</span><span class="bars"><i class="on"></i><i></i><i></i><i></i></span><span class="rssi">-88</span></div>
+          <div class="ssid"><span class="nm">NETGEAR-5G</span><span class="lock wpa">🔒</span><span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="rssi">-52</span></div>
+          <div class="ssid"><span class="nm">ATT4f2k9</span><span class="lock wpa">🔒</span><span class="bars"><i class="on"></i><i class="on"></i><i></i><i></i></span><span class="rssi">-71</span></div>
+        </div>
+      </div>
+
+      <div class="export">
+        <button class="btn">⬇ WiGLE CSV</button>
+        <button class="btn">⬇ KML</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="cap" style="flex-basis:100%;max-width:820px;line-height:1.7">
+  Notes: phone-width PWA, served by the CZ, reached over your phone-hotspot at the
+  URL shown on the deck's LCD. Dashboard = glance + module tiles (Wardrive shows
+  "live", greyed tiles self-disable when their tools aren't installed — that's the
+  same screen on stock RaspiOS, just more tiles greyed). Wardrive detail = big
+  counts, one-tap STOP, the live SSID feed with signal/encryption, and the two
+  exports that consume the kismetdb we already proved works (no map in v1). The
+  fourth dashboard tile is Files — browse the home dir (kali / pi) and upload
+  from the phone.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+[Unit]
+Description=Cardputer Zero Field Console (files agent)
+Documentation=https://github.com/n0xa/czconsole
+PartOf=czconsole.service
+
+[Service]
+Type=simple
+# Runs as the operator so file I/O has correct ownership; this is the SFTP-style
+# "do the file access as the user" half of the privsep split. Small surface.
+User=kali
+Group=czconsole
+# /run/czconsole is created by tmpfiles (shared with the auth agent), not a
+# per-unit RuntimeDirectory — see tmpfiles-czconsole.conf. ProtectSystem=strict
+# makes /run read-only, so the socket dir must be granted back explicitly.
+ExecStart=/usr/local/bin/czconsole --files-agent --files-sock /run/czconsole/files.sock
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/home/kali /run/czconsole
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

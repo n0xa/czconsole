@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0e0a"/>
+  <rect x="96" y="120" width="320" height="200" rx="16" fill="#020402" stroke="#00ff66" stroke-width="8"/>
+  <text x="256" y="245" font-family="monospace" font-size="120" fill="#00ff66"
+        text-anchor="middle" font-weight="bold">CZ</text>
+  <rect x="120" y="360" width="272" height="20" rx="6" fill="#13320f"/>
+  <rect x="120" y="396" width="200" height="20" rx="6" fill="#13320f"/>
+</svg>

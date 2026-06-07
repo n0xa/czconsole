@@ -1,0 +1,16 @@
+// Allow the deprivileged czconsole web worker (_czconsole) to start/stop ONLY
+// the wardrive capture units. This is the narrow, enumerated privileged action
+// of the privsep design: systemd is the monitor, this rule is the allowlist.
+// No setuid is involved (the check happens in PID1/polkit), so it works even
+// with NoNewPrivileges=yes on the worker.
+//
+// Install to /etc/polkit-1/rules.d/50-czconsole-kismet.rules
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "_czconsole") {
+        var unit = action.lookup("unit");
+        if (unit && unit.indexOf("czconsole-kismet@") === 0) {
+            return polkit.Result.YES;
+        }
+    }
+});

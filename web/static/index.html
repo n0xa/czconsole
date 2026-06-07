@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e0a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/style.css">
+<title>CZ Field Console</title>
+</head>
+<body>
+  <header class="appbar">
+    <h1>CZ FIELD CONSOLE</h1>
+    <span id="gps" class="pill">GPS —</span>
+    <span id="batt" class="pill">—</span>
+  </header>
+
+  <main class="wrap">
+    <section class="glance" id="glance"></section>
+
+    <section class="card">
+      <h2>Adapters</h2>
+      <div id="adapters" class="rows">—</div>
+    </section>
+
+    <section class="card">
+      <h2>Modules</h2>
+      <div id="modules" class="tiles">—</div>
+    </section>
+
+    <section class="card mirror">
+      <h2>LCD mirror</h2>
+      <img id="mirror" alt="live LCD" />
+      <div id="mirror-msg" class="dim">tap to refresh</div>
+    </section>
+
+    <footer class="dim" id="foot"></footer>
+  </main>
+
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-head"><span id="modal-title"></span><button id="modal-close">✕</button></div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

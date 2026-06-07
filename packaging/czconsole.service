@@ -1,0 +1,52 @@
+[Unit]
+Description=Cardputer Zero Field Console (web worker)
+Documentation=https://github.com/n0xa/czconsole
+After=network.target czconsole-files.service czconsole-auth.service
+Wants=network.target
+# Files is proxied to the files agent; logins are verified by the auth agent.
+# Bring both up alongside, but don't hard-fail the console if one is down — the
+# dashboard still works, and login errors clearly if the auth agent is missing.
+Wants=czconsole-files.service
+Wants=czconsole-auth.service
+
+[Service]
+Type=simple
+# The privilege boundary: dedicated, powerless, no sudo.
+User=_czconsole
+SupplementaryGroups=i2c kismet video plugdev netdev czconsole
+# Login is enforced by default via CZCONSOLE_OPTS (--require-login …) in the
+# env file; blank that file to fall back to LAN-trusted. '-' = optional.
+# The port is whatever --listen says (default :8080, any unprivileged port).
+# To bind a PRIVILEGED port (<1024, e.g. :80), the empty CapabilityBoundingSet
+# below must grant the bind cap — add to BOTH lines:
+#   CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+#   AmbientCapabilities=CAP_NET_BIND_SERVICE
+# (setcap on the binary alone won't work: NoNewPrivileges + the empty bounding
+# set drop the cap regardless.)
+EnvironmentFile=-/etc/czconsole/czconsole.conf
+ExecStart=/usr/local/bin/czconsole --listen :8080 --files-sock /run/czconsole/files.sock --modules-dir /etc/czconsole/modules.d $CZCONSOLE_OPTS
+Restart=on-failure
+RestartSec=2
+
+# Hardening (the systemd-declarative slice of the privsep design).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+# AF_NETLINK is needed by net.InterfaceAddrs() for interface/IP enumeration
+# (adapter modal + the startup LCD URL). With an empty CapabilityBoundingSet
+# (no CAP_NET_ADMIN), netlink here is read-only introspection — the worker can
+# enumerate addresses/routes but cannot configure networking.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+StateDirectory=czconsole
+ReadWritePaths=/var/lib/czconsole
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
