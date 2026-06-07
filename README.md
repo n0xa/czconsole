@@ -10,6 +10,12 @@ and on the Kali graft. Modules self-detect their dependencies, so the recon /
 SDR / wardrive modules light up on Kali (where the tools live) and sit greyed
 out on stock RaspiOS until you install them — same binary, same `.deb`.
 
+<p align="center">
+  <img src="docs/czconsole-main.png"  width="240" alt="Dashboard">
+  <img src="docs/czconsole-wd.png"    width="240" alt="Wardrive">
+  <img src="docs/czconsole-files.png" width="240" alt="Files">
+</p>
+
 ## Architecture
 
 ```
