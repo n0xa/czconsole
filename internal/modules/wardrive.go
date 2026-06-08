@@ -44,6 +44,21 @@ func NewWardriveModule() *wardriveModule {
 
 func (m *wardriveModule) Manifest() Manifest { return wardriveManifest() }
 
+// TileStatus surfaces capture state on the dashboard tile: green "running" while
+// a capture unit is live, grey "stopped" otherwise. No red "failed" — a cgroup
+// read can't tell a crashed kismet from a clean stop, and wardrive has no
+// enabled-at-boot intent flag to disambiguate (unlike HDMI). Fork-free via
+// running().
+func (m *wardriveModule) TileStatus() *TileStatus {
+	m.mu.Lock()
+	run := m.running()
+	m.mu.Unlock()
+	if run {
+		return &TileStatus{State: "running", Label: "running"}
+	}
+	return &TileStatus{State: "stopped", Label: "stopped"}
+}
+
 func (m *wardriveModule) Mount(mux *http.ServeMux, prefix string, auth Middleware) {
 	sub, _ := fs.Sub(wardriveUI, "assets/wardrive")
 	mux.Handle(prefix, http.StripPrefix(prefix, http.FileServer(http.FS(sub))))
@@ -129,6 +144,7 @@ func (m *wardriveModule) handleStart(w http.ResponseWriter, r *http.Request) {
 func (m *wardriveModule) handleStop(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.running() // adopt a live-but-unowned unit into m.iface first (stateless stop)
 	if m.iface == "" {
 		writeJSON(w, map[string]any{"running": false})
 		return
@@ -139,13 +155,50 @@ func (m *wardriveModule) handleStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"running": false})
 }
 
-// running reports whether the capture unit is active. Caller holds mu.
+// unitProcs reports whether the kismet unit for iface has live processes, read
+// straight from cgroup — a plain file read, NO fork. This is load-bearing: the
+// worker polls status on a memory-starved 512 MB box, and the old code shelled
+// out to `systemctl is-active` every poll. Under swap thrash that fork either
+// fails with ENOMEM or hangs in D-state, and the old running() treated BOTH as
+// "stopped" — so an actively-capturing kismet falsely showed as dead. A cgroup
+// read can't fork and can't hang on the scheduler. Returns (active, known);
+// known=false means we genuinely couldn't tell, so callers must NOT downgrade
+// that to "stopped".
+// unitProcs reports whether the kismet capture unit for iface has live
+// processes — fork-free via cgroup (see unitCgroupActive in module.go). The
+// templated czconsole-kismet@<iface>.service nests under an auto-generated slice
+// (system.slice/system-czconsole\x2dkismet.slice/…), which the shared helper's
+// glob handles.
+func unitProcs(iface string) (active, known bool) { return unitCgroupActive(unitFor(iface)) }
+
+// running reports whether a capture unit is active, fork-free via cgroup (see
+// unitProcs). Caller holds mu. Side effect: it ADOPTS a live-but-unowned unit
+// into m.iface, so a restarted worker (m.iface=="") reports the real capture
+// instead of a false "stopped". An "unknown" reading for a unit we believe is up
+// is reported as still-running, never as stopped.
 func (m *wardriveModule) running() bool {
-	if m.iface == "" {
-		return false
+	if m.iface != "" {
+		active, known := unitProcs(m.iface)
+		if !known {
+			return true // can't tell; don't claim a believed-live capture is dead
+		}
+		if !active {
+			m.iface = "" // genuinely stopped — clear stale state
+		}
+		return active
 	}
-	// `systemctl is-active --quiet` exits 0 iff active.
-	return exec.Command("systemctl", "is-active", "--quiet", unitFor(m.iface)).Run() == nil
+	// Fresh worker with no in-memory iface: scan for an orphaned-but-live unit
+	// (e.g. the worker was OOM-restarted while kismet kept capturing) and adopt it.
+	for _, w := range wifiInterfaces() {
+		if active, known := unitProcs(w); known && active {
+			m.iface = w
+			if m.started.IsZero() {
+				m.started = time.Now() // true start unknown post-adoption; uptime is approximate
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // ── status ────────────────────────────────────────────────────────────────
@@ -166,6 +219,7 @@ func (m *wardriveModule) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"uptime_s": int(time.Since(started).Seconds())}
 
 	if devices, ok := m.kismetDeviceCount(); ok {
+		st["stats_ok"] = true
 		st["devices"] = devices
 		aps := m.kismetAPCount()
 		st["aps"] = aps
@@ -177,6 +231,11 @@ func (m *wardriveModule) handleStatus(w http.ResponseWriter, r *http.Request) {
 			mins = 1
 		}
 		st["new_per_min"] = int(float64(devices)/mins + 0.5)
+	} else {
+		// Capturing (cgroup confirms live processes) but kismet's REST didn't
+		// answer — typically the box is under load. Report "stats unavailable",
+		// NOT "stopped": the capture is still running and logging to disk.
+		st["stats_ok"] = false
 	}
 	st["feed"] = m.kismetRecentAPs(8)
 	writeJSON(w, st)

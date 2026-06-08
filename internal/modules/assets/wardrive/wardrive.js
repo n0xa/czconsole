@@ -42,7 +42,11 @@ async function poll() {
     ['c-aps', 'c-cli', 'c-new'].forEach(id => $(id).textContent = '—');
     return;
   }
-  $('timer').textContent = `session ${fmtUptime(s.uptime_s)}`;
+  // Capturing, but kismet's REST hasn't answered (box under load). The capture
+  // is alive and still logging — say so rather than letting the stale counters
+  // read as "dead".
+  $('timer').textContent = `session ${fmtUptime(s.uptime_s)}`
+    + (s.stats_ok === false ? ' · stats catching up…' : '');
   $('c-aps').textContent = s.aps ?? '—';
   $('c-cli').textContent = s.clients ?? '—';
   $('c-new').textContent = s.new_per_min ?? '—';

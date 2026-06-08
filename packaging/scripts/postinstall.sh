@@ -46,8 +46,13 @@ install -d -m 0755 /etc/czconsole/modules.d
 systemd-tmpfiles --create /usr/lib/tmpfiles.d/czconsole.conf 2>/dev/null || true
 
 systemctl daemon-reload 2>/dev/null || true
+# Enable (boot) then restart. `enable --now` does NOT restart an already-running
+# service, so on UPGRADE the old binary keeps running and the new one never loads
+# (the HDMI module / wardrive-status fix silently wouldn't appear). `restart`
+# starts them on first install and swaps in the new binary on upgrade.
 # Order matters only loosely; the agents come up before/with the worker.
-systemctl enable --now czconsole-auth.service czconsole-files.service czconsole.service 2>/dev/null || true
+systemctl enable czconsole-auth.service czconsole-files.service czconsole.service 2>/dev/null || true
+systemctl restart czconsole-auth.service czconsole-files.service czconsole.service 2>/dev/null || true
 
 echo "czconsole installed. Login is required by default (edit /etc/czconsole/czconsole.conf to change)."
 exit 0

@@ -1,0 +1,21 @@
+// Allow the deprivileged czconsole web worker (_czconsole) to trigger ONLY the
+// two fixed-verb HDMI helper oneshots, which run as root and enable/disable the
+// lightdm desktop. The worker can't enable/disable lightdm itself: lightdm has a
+// SysV init script, so enable/disable invoke update-rc.d — a root filesystem
+// write that is NOT polkit-gated. So the privileged work lives in the helper
+// units (czconsole-hdmi-enable/disable.service) and the worker only gets to
+// START them — manage-units, scoped to those two unit names. Same narrow,
+// enumerated-allowlist shape as 50-czconsole-kismet.rules; no setuid (PID1/polkit
+// does the check, so it works under the worker's NoNewPrivileges).
+//
+// Install to /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "_czconsole") {
+        var unit = action.lookup("unit");
+        if (unit == "czconsole-hdmi-enable.service" ||
+            unit == "czconsole-hdmi-disable.service") {
+            return polkit.Result.YES;
+        }
+    }
+});

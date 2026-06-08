@@ -1,0 +1,16 @@
+[Unit]
+Description=czconsole: enable + start the HDMI desktop (lightdm)
+Documentation=https://github.com/n0xa/czconsole
+# Triggered on demand by the deprivileged czconsole worker via polkit
+# (55-czconsole-hdmi.rules: _czconsole may `systemctl start` this unit only).
+#
+# Why a privileged helper instead of the worker calling systemctl directly:
+# lightdm ships a SysV init script (/etc/init.d/lightdm), so `systemctl enable`
+# invokes update-rc.d — a ROOT filesystem write to /etc/rc?.d/, which is NOT a
+# polkit-gated D-Bus call and so can't be granted to the powerless worker. This
+# fixed-verb root oneshot is the narrow, auditable privileged action (it can
+# ONLY enable+start lightdm), exactly the shape of czconsole-kismet@.service.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl enable --now lightdm.service

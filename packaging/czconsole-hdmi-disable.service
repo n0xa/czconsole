@@ -1,0 +1,12 @@
+[Unit]
+Description=czconsole: disable + stop the HDMI desktop (lightdm)
+Documentation=https://github.com/n0xa/czconsole
+# Demand-triggered by the worker via polkit (55-czconsole-hdmi.rules). Mirror of
+# czconsole-hdmi-enable.service — see it for why a root helper is required
+# (lightdm's SysV init script makes `systemctl disable` a root rc?.d write that
+# polkit can't grant the worker). Fixed verb: this unit can ONLY disable+stop
+# lightdm. Stopping lightdm here frees the RAM the HDMI desktop holds.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl disable --now lightdm.service

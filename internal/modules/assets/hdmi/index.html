@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e0a">
+<link rel="stylesheet" href="/style.css">
+<title>HDMI Desktop — CZ Field Console</title>
+<style>
+  .statusrow{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .light{width:18px;height:18px;border-radius:50%;background:var(--dim);
+    box-shadow:0 0 0 1px var(--line) inset;flex:none}
+  .light.green{background:#39ff8a;box-shadow:0 0 10px #1f9d57, 0 0 0 1px #195e33 inset}
+  .light.grey{background:#2a322a;box-shadow:0 0 0 1px var(--line) inset}
+  .light.red{background:#ff5a5a;box-shadow:0 0 10px #a32020, 0 0 0 1px #5e1919 inset}
+  .light.amber{background:#ffb454;box-shadow:0 0 8px #a3791f,0 0 0 1px #5e4a19 inset}
+  .stxt{font-size:15px;font-weight:700;letter-spacing:.5px;color:#eafff2}
+  .sub{font-size:12px;color:var(--dim);margin-top:2px}
+  .controls{display:flex;gap:10px;margin-top:4px}
+  .btn{flex:1;text-align:center;padding:13px;border-radius:12px;font-weight:700;
+    letter-spacing:1px;border:none;font-family:inherit;font-size:14px;cursor:pointer}
+  .btn.on{background:#0b3018;color:#39ff8a;box-shadow:0 0 0 1px #195e33 inset}
+  .btn.off{background:#2a0d0d;color:#ff5a5a;box-shadow:0 0 0 1px #5e1919 inset}
+  .btn:disabled{opacity:.4;cursor:default}
+  .msg{font-size:12px;color:var(--accent2);min-height:16px;margin-top:8px;white-space:pre-wrap}
+  .msg.err{color:#ff5a5a}
+  .note{font-size:11px;color:var(--dim);line-height:1.4;margin-top:10px}
+</style>
+</head>
+<body>
+  <header class="appbar">
+    <a class="back" href="/" style="color:var(--dim);text-decoration:none;font-size:18px">‹</a>
+    <h1>HDMI DESKTOP</h1>
+    <span id="ufree" class="pill">—</span>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <div class="statusrow">
+        <span id="light" class="light grey"></span>
+        <div>
+          <div id="stxt" class="stxt">—</div>
+          <div id="sub" class="sub"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="controls">
+        <button class="btn on"  id="enable">ENABLE + START</button>
+        <button class="btn off" id="disable">DISABLE + STOP</button>
+      </div>
+      <div id="msg" class="msg"></div>
+      <div class="note">Stopping the HDMI desktop (lightdm) frees the RAM it holds —
+        Xorg, the session, pipewire/wireplumber — which on the 512&nbsp;MB board is
+        the biggest single consumer and the first thing the OOM killer takes under
+        load. The LCD (APPLaunch), this console, kismet and GPS keep running.</div>
+    </section>
+  </main>
+
+  <script src="hdmi.js"></script>
+</body>
+</html>

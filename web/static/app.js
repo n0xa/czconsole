@@ -2,7 +2,7 @@
 // glance row, adapter list, and capability-gated module tiles. Kept dependency-
 // free (vanilla fetch + DOM) so it loads instantly on a phone over hotspot.
 
-const ICONS = { radar:'📡', wave:'〰️', crosshair:'✛', folder:'📁', default:'▣' };
+const ICONS = { radar:'📡', wave:'〰️', crosshair:'✛', folder:'📁', monitor:'🖥️', default:'▣' };
 const $ = (id) => document.getElementById(id);
 
 function gpsLabel(g) {
@@ -70,12 +70,19 @@ async function refreshModules() {
   try { mods = await (await fetch('/api/modules')).json(); }
   catch (e) { return; }
 
+  // Live run-state → tile dot class (set by the backend for stateful modules).
+  const ST = { running: 'run', stopped: 'stop', failed: 'fail', unknown: 'need' };
   $('modules').innerHTML = mods.map(m => {
     const ic = ICONS[m.icon] || ICONS.default;
     const off = m.available ? '' : ' off';
-    const tag = m.available
-      ? '<span class="tag live">● ready</span>'
-      : `<span class="tag need">${(m.missing && m.missing[0]) || 'unavailable'}</span>`;
+    let tag;
+    if (!m.available) {
+      tag = `<span class="tag need">${(m.missing && m.missing[0]) || 'unavailable'}</span>`;
+    } else if (m.status && ST[m.status.state]) {
+      tag = `<span class="tag ${ST[m.status.state]}">● ${m.status.label || m.status.state}</span>`;
+    } else {
+      tag = '<span class="tag live">● ready</span>';
+    }
     const href = m.available ? `/m/${m.id}` : 'javascript:void(0)';
     return `<a class="tile${off}" href="${href}">${tag}
       <div class="ic">${ic}</div>
@@ -186,3 +193,7 @@ $('adapters').addEventListener('click', e => {
 refreshSysinfo(); refreshModules(); refreshMirror();
 setInterval(refreshSysinfo, 2000);
 setInterval(refreshModules, 10000);
+// Auto-refresh the LCD mirror on the same slow cadence as the tiles — keeps the
+// on-screen view current for hands-free / on-the-go glancing without much
+// bandwidth (one small framebuffer JPEG per cycle). Tap still refreshes now.
+setInterval(refreshMirror, 10000);

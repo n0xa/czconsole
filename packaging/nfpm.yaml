@@ -43,9 +43,15 @@ contents:
     dst: /etc/systemd/system/czconsole-auth.service
   - src: ./packaging/czconsole-kismet@.service
     dst: /etc/systemd/system/czconsole-kismet@.service
+  - src: ./packaging/czconsole-hdmi-enable.service
+    dst: /etc/systemd/system/czconsole-hdmi-enable.service
+  - src: ./packaging/czconsole-hdmi-disable.service
+    dst: /etc/systemd/system/czconsole-hdmi-disable.service
 
   - src: ./packaging/50-czconsole-kismet.rules
     dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
+  - src: ./packaging/55-czconsole-hdmi.rules
+    dst: /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
   - src: ./packaging/tmpfiles-czconsole.conf
     dst: /usr/lib/tmpfiles.d/czconsole.conf
 

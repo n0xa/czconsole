@@ -17,13 +17,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 install -m755 "$BIN" /usr/local/bin/czconsole
 
 # Units.
-for u in czconsole.service czconsole-files.service czconsole-auth.service czconsole-kismet@.service; do
+for u in czconsole.service czconsole-files.service czconsole-auth.service czconsole-kismet@.service \
+         czconsole-hdmi-enable.service czconsole-hdmi-disable.service; do
   install -m644 "$HERE/$u" /etc/systemd/system/"$u"
 done
 
-# Polkit rule (kismet), tmpfiles (shared socket dir).
+# Polkit rules (kismet capture, hdmi/lightdm control), tmpfiles (shared socket dir).
 install -d /etc/polkit-1/rules.d
 install -m644 "$HERE/50-czconsole-kismet.rules" /etc/polkit-1/rules.d/50-czconsole-kismet.rules
+install -m644 "$HERE/55-czconsole-hdmi.rules"   /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
 install -m644 "$HERE/tmpfiles-czconsole.conf"   /usr/lib/tmpfiles.d/czconsole.conf
 
 # Config (don't clobber existing edits).
