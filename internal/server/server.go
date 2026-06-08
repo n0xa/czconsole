@@ -213,7 +213,7 @@ func (s *Server) handleAdapter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
-	jpg, err := fb.SnapshotJPEG("/dev/fb0", 80)
+	jpg, err := fb.SnapshotJPEG(fb.FindLCD(), 80)
 	if err != nil {
 		http.Error(w, "display unavailable: "+err.Error(), http.StatusServiceUnavailable)
 		return

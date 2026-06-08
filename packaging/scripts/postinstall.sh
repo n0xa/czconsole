@@ -11,8 +11,16 @@ id _czconsole >/dev/null 2>&1 || \
 # Shared socket group for the worker <-> agents unix sockets.
 getent group czconsole >/dev/null || groupadd --system czconsole
 
-# Worker device/tool groups (least privilege, enumerated).
-usermod -aG i2c,kismet,video,plugdev,netdev,czconsole _czconsole 2>/dev/null || true
+# The wardrive module uses the 'kismet' group, which only exists once kismet is
+# installed (Kali) — NOT on stock Raspberry Pi OS. The worker unit lists it in
+# SupplementaryGroups, so a missing group makes systemd refuse to start it
+# (status=216/GROUP) AND makes the usermod below fail atomically. Pre-create it
+# (empty, harmless; kismet's own postinst is idempotent over it later).
+getent group kismet >/dev/null || groupadd --system kismet
+
+# Worker device/tool groups (least privilege, enumerated). All of these now
+# exist on both Kali and stock RaspiOS, so the usermod won't partial-fail.
+usermod -aG i2c,kismet,video,plugdev,netdev,czconsole _czconsole || true
 
 # Operator user: kali on the graft, pi on Raspberry Pi OS. The files agent runs
 # as this user; patch its unit if we're not on the kali default.

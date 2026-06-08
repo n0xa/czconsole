@@ -13,10 +13,34 @@ import (
 	"image"
 	"image/jpeg"
 	"os"
+	"strings"
 	"unsafe"
 
 	"syscall"
 )
+
+// FindLCD returns the device path of the onboard st7789 LCD framebuffer. The fb
+// index is NOT stable across images: the LCD is /dev/fb0 on the Kali graft but
+// /dev/fb1 on the stock M5 image (where fb0 is the vc4/HDMI KMS framebuffer, so
+// mirroring fb0 there shows a blank HDMI). Match by the driver's registered name
+// ("st7789") instead of assuming an index. Falls back to /dev/fb0.
+func FindLCD() string {
+	entries, err := os.ReadDir("/sys/class/graphics")
+	if err != nil {
+		return "/dev/fb0"
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, "fb") || name == "fbcon" {
+			continue
+		}
+		n, err := os.ReadFile("/sys/class/graphics/" + name + "/name")
+		if err == nil && strings.Contains(strings.ToLower(string(n)), "st7789") {
+			return "/dev/" + name
+		}
+	}
+	return "/dev/fb0"
+}
 
 // Linux fb ioctls.
 const (
