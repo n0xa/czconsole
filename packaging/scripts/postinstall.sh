@@ -22,14 +22,23 @@ getent group kismet >/dev/null || groupadd --system kismet
 # exist on both Kali and stock RaspiOS, so the usermod won't partial-fail.
 usermod -aG i2c,kismet,video,plugdev,netdev,czconsole _czconsole || true
 
-# Operator user: kali on the graft, pi on Raspberry Pi OS. The files agent runs
-# as this user; patch its unit if we're not on the kali default.
-OP=kali
-id kali >/dev/null 2>&1 || OP=pi
+# Operator user detection. Prefer $SUDO_USER (the human who ran sudo apt install),
+# then fall back to kali (Kali graft) or pi (stock Raspberry Pi OS).
+if [ -n "$SUDO_USER" ] && id "$SUDO_USER" >/dev/null 2>&1; then
+  OP="$SUDO_USER"
+elif id kali >/dev/null 2>&1; then
+  OP=kali
+else
+  OP=pi
+fi
 usermod -aG czconsole,kismet "$OP" 2>/dev/null || true
-if [ "$OP" != kali ] && [ -f /etc/systemd/system/czconsole-files.service ]; then
-  sed -i "s/^User=kali\$/User=$OP/; s#/home/kali#/home/$OP#" \
-    /etc/systemd/system/czconsole-files.service
+# Patch all units that hardcode User=kali / /home/kali when the operator differs.
+if [ "$OP" != kali ]; then
+  for svc in czconsole-files.service czconsole-rtlpower.service czconsole-rtl433.service; do
+    [ -f /etc/systemd/system/"$svc" ] && \
+      sed -i "s/^User=kali\$/User=$OP/; s#/home/kali#/home/$OP#" \
+        /etc/systemd/system/"$svc"
+  done
 fi
 
 # Kismet's privsep: cap the capture helper so kismet captures without root.
@@ -37,8 +46,21 @@ if [ -x /usr/bin/kismet_cap_linux_wifi ]; then
   setcap cap_net_admin,cap_net_raw+eip /usr/bin/kismet_cap_linux_wifi 2>/dev/null || true
 fi
 
+# rfheatmap — fetched from GitHub releases (arm64 binary, no build step).
+RFHM_URL="https://github.com/n0xa/rfheatmap/releases/download/v0.1.0/rfheatmap-linux-arm64"
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL -o /usr/local/bin/rfheatmap "$RFHM_URL" && chmod 755 /usr/local/bin/rfheatmap || \
+    echo "warn: rfheatmap download failed — SDR heatmap generation unavailable"
+else
+  echo "warn: curl not found — install rfheatmap manually to /usr/local/bin/rfheatmap"
+fi
+
+# SDR wrapper scripts — installed from the .deb contents block.
+# /usr/local/lib/czconsole/ already contains them; just ensure the dir exists.
+install -d /usr/local/lib/czconsole
+
 # State + config dirs.
-install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole /var/lib/czconsole/wardrive
+install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole /var/lib/czconsole/wardrive /var/lib/czconsole/sdr
 install -d -m 0755 /etc/czconsole/modules.d
 
 # Create the shared socket dir now (it's a tmpfs path; tmpfiles recreates it at

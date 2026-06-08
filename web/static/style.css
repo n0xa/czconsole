@@ -52,6 +52,7 @@ body{margin:0;background:var(--bg);color:var(--fg);
 .tile .tag.run{color:#39ff8a}
 .tile .tag.stop{color:var(--dim)}
 .tile .tag.fail{color:#ff5a5a}
+.tile .tag.warn{color:var(--warn)}
 
 /* The LCD is natively 320x170. Render at native size (crisp, no upscale),
    centered; only scale DOWN on phones narrower than 320 CSS px. aspect-ratio

@@ -71,7 +71,7 @@ async function refreshModules() {
   catch (e) { return; }
 
   // Live run-state → tile dot class (set by the backend for stateful modules).
-  const ST = { running: 'run', stopped: 'stop', failed: 'fail', unknown: 'need' };
+  const ST = { running: 'run', stopped: 'stop', failed: 'fail', unknown: 'need', warn: 'warn' };
   $('modules').innerHTML = mods.map(m => {
     const ic = ICONS[m.icon] || ICONS.default;
     const off = m.available ? '' : ' off';

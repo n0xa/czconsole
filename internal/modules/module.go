@@ -88,7 +88,7 @@ func NewRegistry(dir, filesSock string) *Registry {
 			NewFilesProxy(filesSock),
 			NewWardriveModule(),
 			NewHDMIModule(),
-			newPlaceholder(sdrManifest()),
+			NewSDRModule(),
 			newPlaceholder(netreconManifest()),
 		},
 	}
@@ -200,7 +200,7 @@ func sdrManifest() Manifest {
 	return Manifest{
 		ID: "sdr", Name: "SDR Sweep", Icon: "wave",
 		Description: "rtl_power spectrum sweep + rtl_433 ISM decoder",
-		Requires:    Requires{Binaries: []string{"rtl_power", "rtl_433"}},
+		Requires:    Requires{Binaries: []string{"rtl_power", "rtl_433", "rfheatmap"}},
 		Source:      "bundled",
 	}
 }

@@ -1,0 +1,26 @@
+[Unit]
+Description=czconsole SDR rtl_power spectrum sweep
+After=local-fs.target
+# Prevent both SDR tools running at once (they fight over the USB dongle).
+Conflicts=czconsole-rtl433.service
+
+[Service]
+Type=simple
+# Runs as the operator so it can write ~/SDR/ and access the SDR dongle.
+User=kali
+SupplementaryGroups=plugdev
+# Parameters written by the czconsole web worker before starting this unit.
+EnvironmentFile=/run/czconsole/sdr-rtlpower.env
+ExecStart=/usr/local/lib/czconsole/sdr-rtlpower
+Restart=no
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+# Must be 'no' so the wrapper can create and write ~/SDR/.
+ProtectHome=no
+ReadWritePaths=/home/kali /run/czconsole
+PrivateTmp=yes
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

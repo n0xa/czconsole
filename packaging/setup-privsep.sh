@@ -37,9 +37,10 @@ if [ -x /usr/bin/kismet_cap_linux_wifi ]; then
     echo "warn: setcap on kismet_cap_linux_wifi failed (capture may need root)"
 fi
 
-# Wardrive log/state dir, owned by the worker.
+# State dirs, owned by the worker.
 install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole
 install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole/wardrive
+install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole/sdr
 
 # PAM login layer: the auth agent execs pamtester. Ensure it's present (it's in
 # kali-rolling/main and Debian trixie/main). The actual PAM service file

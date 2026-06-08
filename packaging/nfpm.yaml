@@ -48,10 +48,26 @@ contents:
   - src: ./packaging/czconsole-hdmi-disable.service
     dst: /etc/systemd/system/czconsole-hdmi-disable.service
 
+  - src: ./packaging/czconsole-rtlpower.service
+    dst: /etc/systemd/system/czconsole-rtlpower.service
+  - src: ./packaging/czconsole-rtl433.service
+    dst: /etc/systemd/system/czconsole-rtl433.service
+
   - src: ./packaging/50-czconsole-kismet.rules
     dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
   - src: ./packaging/55-czconsole-hdmi.rules
     dst: /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
+  - src: ./packaging/52-czconsole-sdr.rules
+    dst: /etc/polkit-1/rules.d/52-czconsole-sdr.rules
+
+  - src: ./packaging/sdr-rtlpower
+    dst: /usr/local/lib/czconsole/sdr-rtlpower
+    file_info:
+      mode: 0755
+  - src: ./packaging/sdr-rtl433
+    dst: /usr/local/lib/czconsole/sdr-rtl433
+    file_info:
+      mode: 0755
   - src: ./packaging/tmpfiles-czconsole.conf
     dst: /usr/lib/tmpfiles.d/czconsole.conf
 
