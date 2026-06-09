@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/n0xa/czconsole/internal/sysinfo"
 )
 
 //go:embed assets/wardrive
@@ -56,6 +58,9 @@ func (m *wardriveModule) TileStatus() *TileStatus {
 	if run {
 		return &TileStatus{State: "running", Label: "running"}
 	}
+	if len(wifiInterfaces()) == 0 {
+		return &TileStatus{State: "warn", Label: "no adapter"}
+	}
 	return &TileStatus{State: "stopped", Label: "stopped"}
 }
 
@@ -76,7 +81,7 @@ func wifiInterfaces() []string {
 	nics, _ := os.ReadDir("/sys/class/net")
 	for _, n := range nics {
 		name := n.Name()
-		if _, err := os.Stat("/sys/class/net/" + name + "/wireless"); err == nil {
+		if sysinfo.MonCapIface(name) {
 			out = append(out, name)
 		}
 	}
@@ -211,7 +216,10 @@ func (m *wardriveModule) handleStatus(w http.ResponseWriter, r *http.Request) {
 	m.mu.Unlock()
 
 	if !run {
-		writeJSON(w, map[string]any{"running": false})
+		writeJSON(w, map[string]any{
+			"running":         false,
+			"adapter_present": len(wifiInterfaces()) > 0,
+		})
 		return
 	}
 

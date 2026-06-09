@@ -40,6 +40,14 @@ async function poll() {
   if (!s.running) {
     $('timer').textContent = '';
     ['c-aps', 'c-cli', 'c-new'].forEach(id => $(id).textContent = '—');
+    const present = s.adapter_present !== false;
+    $('start').disabled = !present;
+    if (!present) {
+      $('msg').className = 'msg';
+      $('msg').textContent = 'No monitor-capable WiFi adapter detected';
+    } else if ($('msg').textContent === 'No monitor-capable WiFi adapter detected') {
+      $('msg').textContent = '';
+    }
     return;
   }
   // Capturing, but kismet's REST hasn't answered (box under load). The capture

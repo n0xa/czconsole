@@ -97,6 +97,18 @@ func adapterDriver(name string) string {
 	return filepath.Base(p)
 }
 
+// MonCapIface reports whether the named network interface's driver is in the
+// known-good monitor-mode list. Fork-free: one sysfs Readlink. Returns false
+// for non-wireless or unknown drivers.
+func MonCapIface(name string) bool {
+	drv := adapterDriver(name)
+	if drv == "" {
+		return false
+	}
+	c, ok := driverCaps[drv]
+	return ok && c.mon
+}
+
 // Snapshot collects a fresh reading. Cheap enough to call per-request.
 func Snapshot() Info {
 	var i Info
