@@ -200,6 +200,9 @@ func (m *wardriveModule) running() bool {
 			if m.started.IsZero() {
 				m.started = time.Now() // true start unknown post-adoption; uptime is approximate
 			}
+			if m.pass == "" {
+				m.pass = readSavedPass() // recover REST creds written by previous worker
+			}
 			return true
 		}
 	}
@@ -401,6 +404,21 @@ func (m *wardriveModule) restJSON(method, path string, form url.Values, out any)
 		return fmt.Errorf("kismet %s -> %d", path, resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// readSavedPass recovers the kismet REST password written by writeConfig so a
+// restarted worker can resume polling a still-running kismet instance.
+func readSavedPass() string {
+	b, err := os.ReadFile(filepath.Join(wardriveHome, ".kismet", "kismet_httpd.conf"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if p, ok := strings.CutPrefix(line, "httpd_password="); ok {
+			return strings.TrimSpace(p)
+		}
+	}
+	return ""
 }
 
 func randHex(n int) string {
