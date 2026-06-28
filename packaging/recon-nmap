@@ -1,0 +1,36 @@
+#!/bin/sh
+# czconsole nmap wrapper. Run by czconsole-nmap.service as the OPERATOR user
+# (kali/pi), NOT as the deprivileged web worker. Parameters arrive as env vars
+# via the unit's EnvironmentFile (/run/czconsole/nmap.env), written by the
+# czconsole core just before the unit is started.
+#
+# Output convention (shared by every recon tool): timestamped files under the
+# operator's ~/nmap/, browsable via the Files module next to ~/SDR and readable
+# by the deprivileged frontends (see the privsep notes in docs/native-lcd.md).
+# -oA writes nmap-<ts>.{nmap,xml,gnmap} in one shot; the frontends parse the .xml.
+set -e
+
+NMAP_DIR="${HOME}/nmap"
+mkdir -p "$NMAP_DIR"   # normally pre-created (setgid czconsole) by the postinstall
+
+TS=$(date +%Y-%m-%d-%H-%M-%S)
+PREFIX="${NMAP_DIR}/nmap-${TS}"
+
+# IMPORTANT — why $NMAP_OPTS is left UNQUOTED here:
+#   The shell word-splits the variable's VALUE into separate argv entries for
+#   nmap. It does NOT re-parse that value for control operators: a ';' '|' '&'
+#   '$(...)' inside NMAP_OPTS is an inert literal argument, never a new command.
+#   (Shell metacharacter interpretation happens while parsing the script text,
+#   before variable expansion — expanded values only undergo word-split + glob.)
+#   So this is safe from command injection. The core additionally strips newlines
+#   so the value can't smuggle extra lines into the single-line env file.
+#
+# --privileged: nmap decides "am I privileged?" by euid==0. Running as the
+#   operator (not root) it would otherwise downgrade to a TCP connect scan even
+#   though the unit granted CAP_NET_RAW. --privileged tells it to use the raw
+#   socket the capability now permits (verified: SYN scan works as kali this way).
+if [ "${NMAP_LOG_ERRORS:-0}" = "1" ]; then
+    exec nmap --privileged -oA "$PREFIX" $NMAP_OPTS 2> "${PREFIX}.err"
+else
+    exec nmap --privileged -oA "$PREFIX" $NMAP_OPTS
+fi

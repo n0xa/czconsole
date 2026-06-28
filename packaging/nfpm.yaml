@@ -1,7 +1,8 @@
 # nfpm config for the czconsole .deb.
 #
-# Build the (pure-Go) binary, then package:
-#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole ./cmd/czconsole
+# Build the (pure-Go) binaries, then package:
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole     ./cmd/czconsole
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole-lcd ./cmd/czconsole-lcd
 #   nfpm package --packager deb --config packaging/nfpm.yaml --target dist/
 #
 # The package Depends on pamtester so the PAM login layer works the moment it's
@@ -28,10 +29,19 @@ license: MIT
 depends:
   - pamtester        # PAM login (the auth agent execs it)
   - libpam-modules   # pam_unix / pam_faillock / pam_deny (essential, but explicit)
+  - acl              # setfacl: grants the LCD's _czconsole group traverse on the
+                     # operator home so it can read ~/<tool> output (postinstall)
 
 contents:
   - src: ./czconsole
     dst: /usr/local/bin/czconsole
+    file_info:
+      mode: 0755
+
+  # Native on-screen frontend (separate single-purpose binary; launched as an
+  # APPLaunch tile, registered conditionally by the postinstall).
+  - src: ./czconsole-lcd
+    dst: /usr/local/bin/czconsole-lcd
     file_info:
       mode: 0755
 
@@ -52,6 +62,10 @@ contents:
     dst: /etc/systemd/system/czconsole-rtlpower.service
   - src: ./packaging/czconsole-rtl433.service
     dst: /etc/systemd/system/czconsole-rtl433.service
+  - src: ./packaging/czconsole-nmap.service
+    dst: /etc/systemd/system/czconsole-nmap.service
+  - src: ./packaging/czconsole-gobuster.service
+    dst: /etc/systemd/system/czconsole-gobuster.service
 
   - src: ./packaging/50-czconsole-kismet.rules
     dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
@@ -59,6 +73,10 @@ contents:
     dst: /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
   - src: ./packaging/52-czconsole-sdr.rules
     dst: /etc/polkit-1/rules.d/52-czconsole-sdr.rules
+  - src: ./packaging/53-czconsole-nmap.rules
+    dst: /etc/polkit-1/rules.d/53-czconsole-nmap.rules
+  - src: ./packaging/54-czconsole-gobuster.rules
+    dst: /etc/polkit-1/rules.d/54-czconsole-gobuster.rules
 
   - src: ./packaging/sdr-rtlpower
     dst: /usr/local/lib/czconsole/sdr-rtlpower
@@ -68,8 +86,28 @@ contents:
     dst: /usr/local/lib/czconsole/sdr-rtl433
     file_info:
       mode: 0755
+  - src: ./packaging/recon-nmap
+    dst: /usr/local/lib/czconsole/recon-nmap
+    file_info:
+      mode: 0755
+  - src: ./packaging/recon-gobuster
+    dst: /usr/local/lib/czconsole/recon-gobuster
+    file_info:
+      mode: 0755
   - src: ./packaging/tmpfiles-czconsole.conf
     dst: /usr/lib/tmpfiles.d/czconsole.conf
+
+  # APPLaunch tile + placeholder icon for the native LCD frontend. Staged here;
+  # the postinstall installs them into APPLaunch's dirs ONLY where APPLaunch
+  # exists (the M5 graft, not stock RaspiOS).
+  - src: ./packaging/applaunch/czconsole-lcd.desktop
+    dst: /usr/local/lib/czconsole/applaunch/czconsole-lcd.desktop
+  - src: ./packaging/applaunch/czconsole-lcd.png
+    dst: /usr/local/lib/czconsole/applaunch/czconsole-lcd.png
+  - src: ./packaging/applaunch/czconsole-lcd_100.png
+    dst: /usr/local/lib/czconsole/applaunch/czconsole-lcd_100.png
+  - src: ./packaging/applaunch/czconsole-lcd_80.png
+    dst: /usr/local/lib/czconsole/applaunch/czconsole-lcd_80.png
 
   # Conffiles: preserve site edits across upgrades.
   - src: ./packaging/pam/czconsole

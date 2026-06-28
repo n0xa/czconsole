@@ -31,7 +31,20 @@ RestartSec=2
 # Hardening (the systemd-declarative slice of the privsep design).
 NoNewPrivileges=yes
 ProtectSystem=strict
-ProtectHome=yes
+# ProtectHome=tmpfs hides the operator's home EXCEPT a READ-ONLY view of the
+# wardrive capture dir, which the export (kismetdb_to_wiglecsv/kml) reads. The
+# network-facing worker still cannot see the rest of /home. '-' tolerates the
+# dir not existing yet; the operator path is patched by the postinstall.
+ProtectHome=tmpfs
+# Read-only views of the operator tool-output dirs the worker parses/exports:
+# Wardriving (kismet .kismet → WiGLE/KML export) and nmap (.xml → results).
+# tmpfs hides the rest of /home regardless. The un-sandboxed LCD frontend reaches
+# the SAME dirs via a czconsole-group traverse ACL instead (it has no namespace
+# to bind into) — see the privsep notes in docs/native-lcd.md. '-' tolerates the
+# dir not existing yet; the operator path is patched by the postinstall.
+BindReadOnlyPaths=-/home/kali/Wardriving
+BindReadOnlyPaths=-/home/kali/nmap
+BindReadOnlyPaths=-/home/kali/gobuster
 PrivateTmp=yes
 ProtectControlGroups=yes
 ProtectKernelModules=yes

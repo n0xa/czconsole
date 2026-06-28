@@ -37,6 +37,11 @@ out on stock RaspiOS until you install them — same binary, same `.deb`.
 The front-end renders a module's UI **generically from its manifest** — authors
 declare actions, the core supplies the buttons, log pane, and status fields.
 
+- **Native LCD frontend** (`cmd/czconsole-lcd`): a second single-purpose binary
+  that draws the on-device LCD and reads the keypad directly (launched as an
+  APPLaunch tile), sharing the same modules as the web UI — one backend, two
+  frontends. See [`docs/native-lcd.md`](docs/native-lcd.md).
+
 ## Build
 
 Pure Go, no cgo — cross-compiles from any host with a one-liner:

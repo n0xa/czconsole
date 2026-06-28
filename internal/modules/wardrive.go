@@ -1,64 +1,46 @@
 package modules
 
 import (
-	"crypto/rand"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/n0xa/czconsole/internal/sysinfo"
+	"github.com/n0xa/czconsole/internal/wardrive"
 )
 
 //go:embed assets/wardrive
 var wardriveUI embed.FS
 
-// wardriveHome is the writable state/log/config root for kismet, owned by the
-// worker user (created by setup-privsep.sh). kismet runs unprivileged here via
-// its setcap'd capture helper + the `kismet` group — no root, no sudo.
-const wardriveHome = "/var/lib/czconsole/wardrive"
-const kismetREST = "http://localhost:2501"
-
+// wardriveModule is the HTTP frontend for wardrive capture. All capture logic
+// lives in the shared wardrive.Core (the native LCD wraps the same core), so the
+// web and on-device views show identical state. This file is just request
+// plumbing + the web-only export.
 type wardriveModule struct {
-	mu      sync.Mutex
-	iface   string    // non-empty while a capture unit is active
-	started time.Time
-	pass    string // per-run kismet REST password (generated, never static)
-	hc      *http.Client
+	core *wardrive.Core
 }
 
-func unitFor(iface string) string { return "czconsole-kismet@" + iface + ".service" }
-
 func NewWardriveModule() *wardriveModule {
-	return &wardriveModule{hc: &http.Client{Timeout: 4 * time.Second}}
+	return &wardriveModule{core: wardrive.New()}
 }
 
 func (m *wardriveModule) Manifest() Manifest { return wardriveManifest() }
 
-// TileStatus surfaces capture state on the dashboard tile: green "running" while
-// a capture unit is live, grey "stopped" otherwise. No red "failed" — a cgroup
-// read can't tell a crashed kismet from a clean stop, and wardrive has no
-// enabled-at-boot intent flag to disambiguate (unlike HDMI). Fork-free via
-// running().
+// TileStatus surfaces capture state on the dashboard tile: green "running",
+// grey "stopped", amber "no adapter". (No red "failed" — a cgroup read can't
+// distinguish a crashed kismet from a clean stop.)
 func (m *wardriveModule) TileStatus() *TileStatus {
-	m.mu.Lock()
-	run := m.running()
-	m.mu.Unlock()
-	if run {
+	s := m.core.Status()
+	if s.Running {
 		return &TileStatus{State: "running", Label: "running"}
 	}
-	if len(wifiInterfaces()) == 0 {
+	if !s.AdapterPresent {
 		return &TileStatus{State: "warn", Label: "no adapter"}
 	}
 	return &TileStatus{State: "stopped", Label: "stopped"}
@@ -74,249 +56,54 @@ func (m *wardriveModule) Mount(mux *http.ServeMux, prefix string, auth Middlewar
 	mux.HandleFunc(prefix+"api/export", auth(m.handleExport))
 }
 
-// ── interface picker ──────────────────────────────────────────────────────
-
-func wifiInterfaces() []string {
-	var out []string
-	nics, _ := os.ReadDir("/sys/class/net")
-	for _, n := range nics {
-		name := n.Name()
-		if sysinfo.MonCapIface(name) {
-			out = append(out, name)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func validIface(name string) bool {
-	for _, w := range wifiInterfaces() {
-		if w == name {
-			return true
-		}
-	}
-	return false
-}
-
 func (m *wardriveModule) handleIfaces(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{"ifaces": wifiInterfaces()})
+	writeJSON(w, map[string]any{"ifaces": wardrive.Interfaces()})
 }
 
-// ── start / stop ──────────────────────────────────────────────────────────
+func (m *wardriveModule) handleStatus(w http.ResponseWriter, r *http.Request) {
+	s := m.core.Status()
+	if !s.Running {
+		writeJSON(w, map[string]any{"running": false, "adapter_present": s.AdapterPresent})
+		return
+	}
+	st := map[string]any{"running": true, "iface": s.Iface, "uptime_s": s.UptimeSec}
+	if s.StatsOK {
+		st["stats_ok"] = true
+		st["devices"] = s.Devices
+		st["aps"] = s.APs
+		st["clients"] = s.Clients
+		st["new_per_min"] = s.NewPerMin
+	} else {
+		// Capturing (cgroup confirms live processes) but kismet's REST didn't
+		// answer — report "stats unavailable", NOT "stopped".
+		st["stats_ok"] = false
+	}
+	st["feed"] = m.core.RecentAPs(8)
+	writeJSON(w, st)
+}
 
 func (m *wardriveModule) handleStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+	// The core re-validates the interface against the live monitor-capable list
+	// and refuses if a capture is already live (privsep: the privileged action
+	// re-validates its inputs).
 	iface := r.URL.Query().Get("iface")
-	// Validate against the live interface list — never exec an attacker-chosen
-	// string (privsep rule: the privileged action re-validates its inputs).
-	if !validIface(iface) {
-		http.Error(w, "unknown wifi interface", http.StatusBadRequest)
+	if err := m.core.Start(iface); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.running() {
-		http.Error(w, "already running on "+m.iface, http.StatusConflict)
-		return
-	}
-
-	m.pass = randHex(16)
-	if err := m.writeConfig(); err != nil {
-		http.Error(w, "config: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	os.MkdirAll(filepath.Join(wardriveHome, "logs"), 0o750)
-
-	// Launch the scoped kismet unit via systemd (polkit-authorized). kismet's
-	// privileges live in the unit, NOT in this worker — see czconsole-kismet@.service.
-	// --no-block: queue the start and return immediately so a slow/hung kismet
-	// startup never blocks this HTTP handler (it would otherwise wait up to the
-	// unit's TimeoutStartSec). The status poll's is-active check reflects the
-	// real state once kismet comes up (or fails).
-	if out, err := exec.Command("systemctl", "start", "--no-block", unitFor(iface)).CombinedOutput(); err != nil {
-		http.Error(w, "systemctl start: "+err.Error()+"\n"+string(out), http.StatusInternalServerError)
-		return
-	}
-	m.iface = iface
-	m.started = time.Now()
 	writeJSON(w, map[string]any{"running": true, "iface": iface})
 }
 
 func (m *wardriveModule) handleStop(w http.ResponseWriter, r *http.Request) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.running() // adopt a live-but-unowned unit into m.iface first (stateless stop)
-	if m.iface == "" {
-		writeJSON(w, map[string]any{"running": false})
-		return
-	}
-	// systemd SIGTERMs kismet, which flushes the .kismet log on clean shutdown.
-	exec.Command("systemctl", "stop", unitFor(m.iface)).Run()
-	m.iface = ""
+	_ = m.core.Stop()
 	writeJSON(w, map[string]any{"running": false})
 }
 
-// unitProcs reports whether the kismet unit for iface has live processes, read
-// straight from cgroup — a plain file read, NO fork. This is load-bearing: the
-// worker polls status on a memory-starved 512 MB box, and the old code shelled
-// out to `systemctl is-active` every poll. Under swap thrash that fork either
-// fails with ENOMEM or hangs in D-state, and the old running() treated BOTH as
-// "stopped" — so an actively-capturing kismet falsely showed as dead. A cgroup
-// read can't fork and can't hang on the scheduler. Returns (active, known);
-// known=false means we genuinely couldn't tell, so callers must NOT downgrade
-// that to "stopped".
-// unitProcs reports whether the kismet capture unit for iface has live
-// processes — fork-free via cgroup (see unitCgroupActive in module.go). The
-// templated czconsole-kismet@<iface>.service nests under an auto-generated slice
-// (system.slice/system-czconsole\x2dkismet.slice/…), which the shared helper's
-// glob handles.
-func unitProcs(iface string) (active, known bool) { return unitCgroupActive(unitFor(iface)) }
-
-// running reports whether a capture unit is active, fork-free via cgroup (see
-// unitProcs). Caller holds mu. Side effect: it ADOPTS a live-but-unowned unit
-// into m.iface, so a restarted worker (m.iface=="") reports the real capture
-// instead of a false "stopped". An "unknown" reading for a unit we believe is up
-// is reported as still-running, never as stopped.
-func (m *wardriveModule) running() bool {
-	if m.iface != "" {
-		active, known := unitProcs(m.iface)
-		if !known {
-			return true // can't tell; don't claim a believed-live capture is dead
-		}
-		if !active {
-			m.iface = "" // genuinely stopped — clear stale state
-		}
-		return active
-	}
-	// Fresh worker with no in-memory iface: scan for an orphaned-but-live unit
-	// (e.g. the worker was OOM-restarted while kismet kept capturing) and adopt it.
-	for _, w := range wifiInterfaces() {
-		if active, known := unitProcs(w); known && active {
-			m.iface = w
-			if m.started.IsZero() {
-				m.started = time.Now() // true start unknown post-adoption; uptime is approximate
-			}
-			if m.pass == "" {
-				m.pass = readSavedPass() // recover REST creds written by previous worker
-			}
-			return true
-		}
-	}
-	return false
-}
-
-// ── status ────────────────────────────────────────────────────────────────
-
-func (m *wardriveModule) handleStatus(w http.ResponseWriter, r *http.Request) {
-	m.mu.Lock()
-	run := m.running()
-	iface := m.iface
-	started := m.started
-	m.mu.Unlock()
-
-	if !run {
-		writeJSON(w, map[string]any{
-			"running":         false,
-			"adapter_present": len(wifiInterfaces()) > 0,
-		})
-		return
-	}
-
-	st := map[string]any{"running": true, "iface": iface,
-		"uptime_s": int(time.Since(started).Seconds())}
-
-	if devices, ok := m.kismetDeviceCount(); ok {
-		st["stats_ok"] = true
-		st["devices"] = devices
-		aps := m.kismetAPCount()
-		st["aps"] = aps
-		if devices >= aps {
-			st["clients"] = devices - aps // wifi non-AP ≈ clients
-		}
-		mins := time.Since(started).Minutes()
-		if mins < 1 {
-			mins = 1
-		}
-		st["new_per_min"] = int(float64(devices)/mins + 0.5)
-	} else {
-		// Capturing (cgroup confirms live processes) but kismet's REST didn't
-		// answer — typically the box is under load. Report "stats unavailable",
-		// NOT "stopped": the capture is still running and logging to disk.
-		st["stats_ok"] = false
-	}
-	st["feed"] = m.kismetRecentAPs(8)
-	writeJSON(w, st)
-}
-
-func (m *wardriveModule) kismetDeviceCount() (int, bool) {
-	var s struct {
-		Count int `json:"kismet.system.devices.count"`
-	}
-	if err := m.restJSON("GET", "/system/status.json", nil, &s); err != nil {
-		return 0, false
-	}
-	return s.Count, true
-}
-
-func (m *wardriveModule) kismetAPCount() int {
-	var views []struct {
-		ID   string `json:"kismet.devices.view.id"`
-		Size int    `json:"kismet.devices.view.size"`
-	}
-	if err := m.restJSON("GET", "/devices/views/all_views.json", nil, &views); err != nil {
-		return 0
-	}
-	for _, v := range views {
-		if v.ID == "phydot11_accesspoints" {
-			return v.Size
-		}
-	}
-	return 0
-}
-
-type feedEntry struct {
-	Name  string `json:"name"`
-	Sig   int    `json:"sig"`
-	Crypt string `json:"crypt"`
-}
-
-func (m *wardriveModule) kismetRecentAPs(n int) []feedEntry {
-	// Kismet field-simplified POST with [path,rename] pairs → array of objects.
-	spec := `{"fields":[` +
-		`["kismet.device.base.commonname","name"],` +
-		`["kismet.device.base.signal/kismet.common.signal.last_signal","sig"],` +
-		`["kismet.device.base.crypt","crypt"],` +
-		`["kismet.device.base.last_time","last"]]}`
-	form := url.Values{"json": {spec}}
-	var rows []struct {
-		Name  string `json:"name"`
-		Sig   int    `json:"sig"`
-		Crypt string `json:"crypt"`
-		Last  int64  `json:"last"`
-	}
-	if err := m.restJSON("POST", "/devices/views/phydot11_accesspoints/devices.json", form, &rows); err != nil {
-		return nil
-	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Last > rows[j].Last })
-	out := make([]feedEntry, 0, n)
-	for i, row := range rows {
-		if i >= n {
-			break
-		}
-		name := row.Name
-		if name == "" {
-			name = "<hidden>"
-		}
-		out = append(out, feedEntry{Name: name, Sig: row.Sig, Crypt: row.Crypt})
-	}
-	return out
-}
-
-// ── export (WiGLE CSV / KML) ──────────────────────────────────────────────
+// ── export (WiGLE CSV / KML) — web-only; reads the .kismet sqlite log ─────────
 
 func (m *wardriveModule) handleExport(w http.ResponseWriter, r *http.Request) {
 	fmtArg := r.URL.Query().Get("fmt")
@@ -330,15 +117,17 @@ func (m *wardriveModule) handleExport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fmt must be wigle or kml", http.StatusBadRequest)
 		return
 	}
-	logf := latestKismetLog()
+	// Capture logs live in the operator's ~/Wardriving (the worker sees it via a
+	// read-only bind mount).
+	logf := newestKismetLog(filepath.Join(DefaultFilesRoot(), "Wardriving"))
 	if logf == "" {
 		http.Error(w, "no capture log yet", http.StatusNotFound)
 		return
 	}
 	tmp := filepath.Join(os.TempDir(), "czwardrive."+ext)
 	defer os.Remove(tmp)
-	// --skip-clean: don't VACUUM, which needs an exclusive lock kismet holds
-	// while capturing. Lets exports run mid-session against the live db.
+	// --skip-clean: don't VACUUM (needs an exclusive lock kismet holds while
+	// capturing), so exports work mid-session against the live db.
 	out, err := exec.Command(tool, "--in", logf, "--out", tmp, "--force", "--skip-clean").CombinedOutput()
 	if err != nil {
 		http.Error(w, tool+": "+err.Error()+"\n"+string(out), http.StatusInternalServerError)
@@ -355,8 +144,9 @@ func (m *wardriveModule) handleExport(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, f)
 }
 
-func latestKismetLog() string {
-	matches, _ := filepath.Glob(filepath.Join(wardriveHome, "logs", "*.kismet"))
+// newestKismetLog returns the most recently modified *.kismet capture in dir.
+func newestKismetLog(dir string) string {
+	matches, _ := filepath.Glob(filepath.Join(dir, "*.kismet"))
 	var newest string
 	var newestT time.Time
 	for _, p := range matches {
@@ -367,66 +157,7 @@ func latestKismetLog() string {
 	return newest
 }
 
-// ── kismet config + REST helpers ──────────────────────────────────────────
-
-func (m *wardriveModule) writeConfig() error {
-	kdir := filepath.Join(wardriveHome, ".kismet")
-	if err := os.MkdirAll(kdir, 0o750); err != nil {
-		return err
-	}
-	httpd := fmt.Sprintf("httpd_username=czconsole\nhttpd_password=%s\n", m.pass)
-	if err := os.WriteFile(filepath.Join(kdir, "kismet_httpd.conf"), []byte(httpd), 0o600); err != nil {
-		return err
-	}
-	site := "gps=gpsd:host=localhost,port=2947\n"
-	return os.WriteFile(filepath.Join(kdir, "kismet_site.conf"), []byte(site), 0o644)
-}
-
-func (m *wardriveModule) restJSON(method, path string, form url.Values, out any) error {
-	var body io.Reader
-	if form != nil {
-		body = strings.NewReader(form.Encode())
-	}
-	req, err := http.NewRequest(method, kismetREST+path, body)
-	if err != nil {
-		return err
-	}
-	req.SetBasicAuth("czconsole", m.pass)
-	if form != nil {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	}
-	resp, err := m.hc.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("kismet %s -> %d", path, resp.StatusCode)
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
-}
-
-// readSavedPass recovers the kismet REST password written by writeConfig so a
-// restarted worker can resume polling a still-running kismet instance.
-func readSavedPass() string {
-	b, err := os.ReadFile(filepath.Join(wardriveHome, ".kismet", "kismet_httpd.conf"))
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.Split(string(b), "\n") {
-		if p, ok := strings.CutPrefix(line, "httpd_password="); ok {
-			return strings.TrimSpace(p)
-		}
-	}
-	return ""
-}
-
-func randHex(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
+// writeJSON is the package-wide JSON responder (also used by sibling modules).
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)

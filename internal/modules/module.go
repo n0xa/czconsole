@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
-	"strings"
+
+	"github.com/n0xa/czconsole/internal/unit"
 )
 
 // Middleware wraps a handler with the server's shared-token auth. Modules apply
@@ -89,7 +89,7 @@ func NewRegistry(dir, filesSock string) *Registry {
 			NewWardriveModule(),
 			NewHDMIModule(),
 			NewSDRModule(),
-			newPlaceholder(netreconManifest()),
+			NewNmapModule(),
 		},
 	}
 }
@@ -136,36 +136,10 @@ func (r *Registry) Mount(mux *http.ServeMux, auth Middleware) {
 }
 
 // unitCgroupActive reports whether a systemd unit has live processes, read
-// straight from its cgroup — a plain file read, NO fork. This matters on the
-// memory-starved 512 MB CM0: shelling out to `systemctl is-active` forks a
-// process that under swap thrash either ENOMEM-fails or hangs in D-state, and
-// treating that as "stopped" misreports a live unit as dead (see wardrive.go).
-// The parent slice path varies, so glob for the unit's (fixed) leaf cgroup dir:
-// plain services sit at system.slice/<unit>/, but a templated dashed unit nests
-// under an auto-generated slice (system.slice/system-foo\x2dbar.slice/…). The
-// \x2d is literal in the dir name. Returns (active, known); known=false means
-// genuinely indeterminate — callers must NOT downgrade that to "stopped".
-func unitCgroupActive(unit string) (active, known bool) {
-	globs := []string{
-		"/sys/fs/cgroup/system.slice/" + unit + "/cgroup.procs",           // v2, no extra slice
-		"/sys/fs/cgroup/system.slice/*/" + unit + "/cgroup.procs",         // v2, nested auto-slice
-		"/sys/fs/cgroup/systemd/system.slice/" + unit + "/cgroup.procs",   // v1 hybrid
-		"/sys/fs/cgroup/systemd/system.slice/*/" + unit + "/cgroup.procs", // v1 hybrid, nested
-	}
-	for _, g := range globs {
-		matches, _ := filepath.Glob(g)
-		for _, p := range matches {
-			if b, err := os.ReadFile(p); err == nil {
-				return len(strings.TrimSpace(string(b))) > 0, true
-			}
-		}
-	}
-	// systemd GCs a stopped unit's cgroup (and its empty auto-slice), so if the
-	// hierarchy is mounted at all, no match ⇒ definitively not running.
-	if _, err := os.Stat("/sys/fs/cgroup/system.slice"); err == nil {
-		return false, true
-	}
-	return false, false
+// straight from its cgroup — a plain file read, NO fork. Thin wrapper over the
+// shared internal/unit helper (kept so sdr/hdmi/wardrive callers are unchanged).
+func unitCgroupActive(name string) (active, known bool) {
+	return unit.CgroupActive(name)
 }
 
 func resolve(req Requires) (ok bool, missing []string) {

@@ -1,0 +1,33 @@
+[Unit]
+Description=czconsole gobuster dir scan
+Documentation=https://github.com/n0xa/czconsole
+After=local-fs.target network-online.target
+# Started per-scan: the czconsole core writes /run/czconsole/gobuster.env (URL,
+# wordlist, options) then `systemctl start`s this unit via polkit (authorized for
+# _czconsole — see 54-czconsole-gobuster.rules).
+
+[Service]
+Type=simple
+# Runs as the OPERATOR so the scan writes ~/gobuster/ (browsable via Files) owned
+# by the human. The operator path is patched from kali by the postinstall.
+User=kali
+EnvironmentFile=/run/czconsole/gobuster.env
+ExecStart=/usr/local/lib/czconsole/recon-gobuster
+Restart=no
+
+# No special capabilities: gobuster is plain HTTP, so unlike nmap it needs no
+# CAP_NET_RAW. NoNewPrivileges + an empty bounding set keep it least-privilege.
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Hardened. ProtectHome must be 'no' so the wrapper writes ~/gobuster.
+ProtectSystem=strict
+ProtectHome=no
+ReadWritePaths=/home/kali /run/czconsole
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

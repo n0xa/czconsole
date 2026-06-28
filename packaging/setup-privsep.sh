@@ -20,11 +20,13 @@ getent group czconsole >/dev/null || groupadd --system czconsole
 # Worker group memberships (least privilege, enumerated):
 #   i2c     -> read /dev/i2c-1 (battery)
 #   kismet  -> invoke kismet's setcap'd capture helper
-#   video   -> /dev/fb0 (LCD mirror)
+#   video   -> /dev/fb0 (LCD mirror; and the native LCD frontend writes it)
+#   input   -> /dev/input/event3 (keypad; native LCD frontend reads it)
+#   render  -> /dev/dri render node (native LCD frontend)
 #   plugdev -> USB SDR / Wi-Fi adapters
 #   netdev  -> network state
 #   czconsole -> connect the files-agent socket
-usermod -aG i2c,kismet,video,plugdev,netdev,czconsole _czconsole
+usermod -aG i2c,kismet,video,input,render,plugdev,netdev,czconsole _czconsole
 
 # Operator shares the socket group (to be reached by the worker) and kismet.
 usermod -aG czconsole,kismet "$FILES_USER" 2>/dev/null || true
