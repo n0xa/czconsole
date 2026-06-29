@@ -71,18 +71,28 @@ var driverCaps = map[string]struct{ mon, inject bool }{
 	"mt7921au":  {true, true},
 	// Realtek out-of-tree (when built — see graft's 88XXau ask)
 	"8812au":    {true, true}, // RTL8812AU/8811AU (AWUS036ACS/AC, Archer T2U)
-	"88XXau":    {true, true},
+	"88XXau":    {true, true}, // sysfs driver name varies — both forms observed
+	"rtl88XXau": {true, true},
 	"rtl8812au": {true, true},
 	"rtl8814au": {true, true},
 	"88x2bu":    {true, true}, // RTL8812BU
+	"rtl88x2bu": {true, true},
 	// Older
 	"rtl8187": {true, true}, // RTL8187L (AWUS036H)
 	"zd1211rw": {true, true},
 	"p54usb":   {true, true},
+	// Realtek rtw88 stack
+	"rtw88_8821au": {true, true},  // RTL8821AU (AWUS036ACS, AWUS036AC)
+	"rtw88_8821ce": {true, true},  // RTL8821CE
+	"rtw88_8812au": {true, true},  // RTL8812AU via rtw88
+	"rtw88_8822bu": {true, false}, // RTL8822BU — monitor ok, inject unreliable
+	"rtw88_8822be": {true, false},
+	"rtw88_8822ce": {true, false},
+	"rtw88_8723de": {true, false},
 	// Monitor ok, injection unreliable/no
-	"iwlwifi":   {true, false}, // Intel
-	"rtl8xxxu":  {true, false},
-	"rtw_8822bu": {true, false},
+	"iwlwifi":    {true, false}, // Intel
+	"rtl8xxxu":   {true, false},
+	"rtw_8822bu": {true, false}, // older alias — keep for compatibility
 	// Onboard CZ / Pi — FullMAC, neither without a nexmon patch
 	"brcmfmac": {false, false},
 }

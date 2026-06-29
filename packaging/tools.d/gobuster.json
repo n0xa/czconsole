@@ -1,0 +1,30 @@
+{
+  "id": "gobuster",
+  "name": "gobuster",
+  "group": "Net Recon",
+  "binary": "gobuster",
+  "class": "plain",
+  "inputs": [
+    { "id": "url", "label": "TARGET URL", "type": "text", "default": "",
+      "placeholder": "http://192.168.1.1", "required": true },
+    { "id": "wordlist", "label": "WORDLIST", "type": "text",
+      "default": "/usr/share/wordlists/dirb/common.txt", "placeholder": "" },
+    { "id": "opts", "label": "OPTIONS", "type": "text", "default": "-t 50", "placeholder": "" }
+  ],
+  "command": {
+    "argv": ["gobuster", "dir", "-u", "{{url}}", "-w", "{{wordlist}}", "{{opts...}}"]
+  },
+  "results": {
+    "kind": "text",
+    "file": ".output",
+    "colorize": [
+      { "match": "Status:\\s*2\\d\\d", "color": "accent" },
+      { "match": "Status:\\s*[45]\\d\\d", "color": "dim" }
+    ]
+  },
+  "running": {
+    "label": "RUNNING…",
+    "subject": "{{url}}",
+    "controls": "cancel-background"
+  }
+}

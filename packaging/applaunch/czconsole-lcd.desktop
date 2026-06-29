@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kali Tools
+Comment=czconsole native field console (LCD)
+Exec=sudo -n -u _czconsole /usr/local/bin/czconsole-lcd
+Icon=share/images/czconsole-lcd.png
+Terminal=false
+Categories=Utility;
+StartupNotify=false

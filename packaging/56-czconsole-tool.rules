@@ -1,0 +1,19 @@
+// Allow the deprivileged czconsole worker (_czconsole) to start/stop the generic
+// tool-runner units of the JSON tool framework (Deck #275): czconsole-tool@<id>
+// (plain) and czconsole-tool-netraw@<id> (CAP_NET_RAW). The worker supplies only
+// the tool id + input values; the command + caps come from the trusted spec the
+// runner reads, and the runner refuses caps beyond the spec's class. So the
+// worker's ceiling is bounded to CAP_NET_RAW running a TRUSTED binary — the same
+// ceiling as the old per-tool units.
+//
+// Install to /etc/polkit-1/rules.d/56-czconsole-tool.rules
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "_czconsole") {
+        var unit = action.lookup("unit");
+        if (unit && (unit.indexOf("czconsole-tool@") === 0 ||
+                     unit.indexOf("czconsole-tool-netraw@") === 0)) {
+            return polkit.Result.YES;
+        }
+    }
+});

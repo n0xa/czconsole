@@ -87,16 +87,5 @@ $('stop').addEventListener('click', async () => {
   } catch (e) { $('msg').className = 'msg err'; $('msg').textContent = 'stop failed: ' + e; }
 });
 
-// GPS pill mirrors the core dashboard's source.
-async function gps() {
-  try {
-    const s = await (await fetch('/api/sysinfo')).json();
-    const g = s.gps;
-    $('gps').textContent = (g && g.ok) ? `GPS ${g.mode === 3 ? '3D' : '2D'}${g.sats ? ' · ' + g.sats : ''}` : 'GPS —';
-    $('gps').className = (g && g.ok) ? 'pill gps' : 'pill';
-  } catch (e) {}
-}
-
-loadIfaces(); poll(); gps();
+loadIfaces(); poll();
 setInterval(poll, 2000);
-setInterval(gps, 2000);

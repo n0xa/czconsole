@@ -10,9 +10,17 @@ After=gpsd.service
 [Service]
 Type=simple
 User=_czconsole
-SupplementaryGroups=kismet plugdev netdev
+# czconsole: write captures into the operator's group-writable ~/Wardriving.
+SupplementaryGroups=kismet plugdev netdev czconsole
 Environment=HOME=/var/lib/czconsole/wardrive
-ExecStart=/usr/bin/kismet --no-ncurses -s --homedir /var/lib/czconsole/wardrive -c %i -p /var/lib/czconsole/wardrive/logs
+# Config/creds/db stay in _czconsole's isolated homedir (the Core manages them),
+# but the human-facing .kismet capture logs land in the operator's home next to
+# ~/SDR — browsable via the Files module. The operator path is patched from kali
+# to the real operator by the postinstall.
+# --override points kismet at our homedir site config (gps=gpsd:...). kismet only
+# auto-loads kismet_site.conf from /etc/kismet, NOT from --homedir, so without
+# this our GPS source is silently ignored and captures have no coordinates.
+ExecStart=/usr/bin/kismet --no-ncurses -s --homedir /var/lib/czconsole/wardrive --override /var/lib/czconsole/wardrive/.kismet/kismet_site.conf -c %i -p /home/kali/Wardriving
 Restart=no
 
 # Scoped privileges kismet requires (and nothing else).
@@ -21,9 +29,11 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK AF_PACKET
 NoNewPrivileges=no
 
-# Still hardened where it can be.
+# Still hardened where it can be. ProtectHome=tmpfs hides every home EXCEPT the
+# one capture-log dir bound in read-write (the '-' tolerates it not existing yet).
 ProtectSystem=strict
-ProtectHome=yes
+ProtectHome=tmpfs
+BindPaths=-/home/kali/Wardriving
 ReadWritePaths=/var/lib/czconsole
 PrivateTmp=yes
 ProtectKernelModules=yes
