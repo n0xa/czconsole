@@ -16,7 +16,7 @@
   },
   "results": {
     "kind": "text",
-    "file": ".stdout",
+    "file": ".output",
     "colorize": [
       { "match": "Status:\\s*2\\d\\d", "color": "accent" },
       { "match": "Status:\\s*[45]\\d\\d", "color": "dim" }

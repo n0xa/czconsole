@@ -17,7 +17,10 @@ Environment=HOME=/var/lib/czconsole/wardrive
 # but the human-facing .kismet capture logs land in the operator's home next to
 # ~/SDR — browsable via the Files module. The operator path is patched from kali
 # to the real operator by the postinstall.
-ExecStart=/usr/bin/kismet --no-ncurses -s --homedir /var/lib/czconsole/wardrive -c %i -p /home/kali/Wardriving
+# --override points kismet at our homedir site config (gps=gpsd:...). kismet only
+# auto-loads kismet_site.conf from /etc/kismet, NOT from --homedir, so without
+# this our GPS source is silently ignored and captures have no coordinates.
+ExecStart=/usr/bin/kismet --no-ncurses -s --homedir /var/lib/czconsole/wardrive --override /var/lib/czconsole/wardrive/.kismet/kismet_site.conf -c %i -p /home/kali/Wardriving
 Restart=no
 
 # Scoped privileges kismet requires (and nothing else).

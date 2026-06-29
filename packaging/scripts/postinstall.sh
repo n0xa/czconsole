@@ -1,6 +1,6 @@
 #!/bin/sh
-# czconsole .deb postinstall — the privsep setup (same intent as
-# setup-privsep.sh), run automatically on install.
+# czconsole .deb postinstall — privsep setup (worker user, groups, caps, state
+# dirs, tool-output dirs + ACL), run automatically on install.
 set -e
 
 # Dedicated, powerless web-worker user (the privilege boundary). No home, no
@@ -93,6 +93,14 @@ install -d /usr/local/lib/czconsole
 # State + config dirs.
 install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole /var/lib/czconsole/wardrive
 install -d -m 0755 /etc/czconsole/modules.d
+
+# Seed kismet's GPS override in its homedir. kismet only auto-loads kismet_site.conf
+# from /etc/kismet, so the unit passes --override <this file>; the Core rewrites it
+# on each capture, but it must exist up front since a missing --override is fatal.
+install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole/wardrive/.kismet
+printf 'gps=gpsd:host=localhost,port=2947\n' > /var/lib/czconsole/wardrive/.kismet/kismet_site.conf
+chown _czconsole:_czconsole /var/lib/czconsole/wardrive/.kismet/kismet_site.conf
+chmod 0644 /var/lib/czconsole/wardrive/.kismet/kismet_site.conf
 
 # ── Tool-output dirs in the operator's home (the shared recon-tool convention) ─
 # Every capture/recon tool writes timestamped files under ~/<tool>/ so they're

@@ -3,11 +3,11 @@ package lcd
 import "image"
 
 // drawRunningView is the shared live-run view: a centred status word, the subject
-// (target/command), a note, and one or more buttons. Callers pass the buttons
-// ([Cancel, Background] for one-shots; [Stop] for continuous) and the focused
-// index.
-func drawRunningView(c *Canvas, title, status, subject, note string, buttons []string, focus int) {
-	content := drawChrome(c, title, "tab:switch  ent:select  esc:bg")
+// (target/command), a note, and one or more buttons. Callers pass the footer
+// hint, the buttons ([Cancel, Background] for one-shots; [Stop] for continuous),
+// and the focused index.
+func drawRunningView(c *Canvas, title, footer, status, subject, note string, buttons []string, focus int) {
+	content := drawChrome(c, title, footer)
 	small := c.Faces().Small
 
 	y := content.Min.Y + 14

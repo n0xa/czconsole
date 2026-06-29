@@ -46,14 +46,17 @@ type Spec struct {
 	Post    *Post   `json:"post,omitempty"`
 }
 
-// Input is one config-page field.
+// Input is one config-page field. Type "note" is not a field at all — it renders
+// static explanatory text (its Text, \n-separated) inline at its position in the
+// list, so a spec can drop hints between inputs or as a blurb after them.
 type Input struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
-	Type        string `json:"type"`        // "text" | "checkbox"
+	Type        string `json:"type"`        // "text" | "checkbox" | "note"
 	Default     string `json:"default"`     // text default; "1"/"0" for checkbox
 	Placeholder string `json:"placeholder"` // hint shown when a text field is empty
 	Required    bool   `json:"required"`    // submit blocked until this text field is non-empty
+	Text        string `json:"text"`        // type "note": the explanatory text (\n for lines)
 }
 
 // Command is the argv template. Each element is a literal or carries tokens:
@@ -65,7 +68,7 @@ type Input struct {
 // run-tool substitutes: literals pass through; single-value tokens are one argv
 // each; the "..." form word-splits. Control operators in a value are inert (they
 // become literal args, never shell syntax) — today's injection-safety, made
-// declarative. stdout+stderr are always captured to {{outfile}}.stdout.
+// declarative. The combined stdout+stderr are always captured to {{outfile}}.output.
 type Command struct {
 	Argv []string `json:"argv"`
 }
@@ -73,7 +76,7 @@ type Command struct {
 // Results says how the results page renders the run's output.
 type Results struct {
 	Kind        string      `json:"kind"`         // "text" (show output) | "path" (file location) | "image" (pan viewer)
-	File        string      `json:"file"`         // outfile suffix to read / point at: ".nmap", ".stdout", ".pcap", ".csv"
+	File        string      `json:"file"`         // outfile suffix to read / point at: ".nmap", ".output", ".pcap", ".csv"
 	Image       string      `json:"image"`        // (kind=image) sibling-image suffix to view, e.g. ".png"; falls back to File's path if absent
 	StripPrefix string      `json:"strip_prefix"` // drop output lines starting with this (e.g. "#")
 	Colorize    []ColorRule `json:"colorize"`     // regex → colour, at-a-glance highlighting (display only, NOT parsing)

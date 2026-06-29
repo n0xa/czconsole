@@ -76,43 +76,46 @@ clients.
 
 The three tiers stack: **nothing (LAN-trusted) -> shared token -> PAM login**.
 
-## Install (privsep, two services)
+## Install
 
-The console runs as **two** systemd services: a deprivileged web worker
-(`_czconsole`) and a small files-agent (the operator) bridged by a unix socket —
-see the security model below. One-time device setup + install:
+Build the **`.deb`** from `packaging/nfpm.yaml` with
+[`nfpm`](https://nfpm.goreleaser.com/) on the x86 host (pure-Go cross-compile, no
+dpkg toolchain or target hardware needed), then install it on the device:
 
 ```sh
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o czconsole ./cmd/czconsole   # host
-scp czconsole packaging/* kali@cz:/tmp/
-ssh kali@cz '
-  sudo FILES_USER=kali sh /tmp/setup-privsep.sh                  # users/groups/setcap
-  sudo install -m755 /tmp/czconsole /usr/local/bin/czconsole
-  sudo install -m644 /tmp/czconsole.service /tmp/czconsole-files.service /etc/systemd/system/
-  sudo install -m644 "/tmp/czconsole-kismet@.service" /etc/systemd/system/   # wardrive capture
-  sudo install -m644 /tmp/50-czconsole-kismet.rules /etc/polkit-1/rules.d/   # polkit allowlist
-  sudo systemctl daemon-reload && sudo systemctl restart polkit
-  sudo systemctl enable --now czconsole-files czconsole'
+# host — cross-build the three binaries the manifest bundles
+for c in czconsole czconsole-lcd czconsole-runtool; do
+  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o "$c" "./cmd/$c"
+done
+CZCONSOLE_VERSION=0.1.0 nfpm package -f packaging/nfpm.yaml -p deb   # -> czconsole_0.1.0_arm64.deb
+scp czconsole_*_arm64.deb kali@cz:/tmp/
+ssh kali@cz 'sudo apt install -y /tmp/czconsole_*_arm64.deb'
 ```
 
-## Packaging & release (planned)
+The package's postinstall does all device setup automatically: the deprivileged
+`_czconsole` worker user + the `czconsole` socket group and memberships, `setcap`
+on the kismet capture helper, the units + polkit rules + JSON tool specs, and the
+`~/<tool>` output dirs with the traverse-ACL. The console then runs as **two**
+systemd services — a deprivileged web worker (`_czconsole`) and a files-agent (the
+operator) bridged by a unix socket; see the security model below.
 
-The release pipeline will produce a **`.deb`** for one-command install on the
-Kali graft and stock RaspiOS alike (both Debian Trixie). Intended shape:
+## Packaging & release
 
-- **Contents:** the cross-built binary, both systemd units, `/etc/czconsole/modules.d/`.
-- **`postinst`:** runs the `setup-privsep.sh` logic (create `_czconsole` +
-  `czconsole` group, the enumerated group memberships, `setcap` the kismet
-  capture helper, state dirs), `daemon-reload`, enable + start both services.
-- **`prerm`:** stop + disable; **`postrm` (purge):** remove the system user.
-- **`Recommends:`** `kismet gpsd rtl-sdr nmap` — not hard deps, since modules
-  self-disable when their tools are absent.
-- **Tooling:** likely [`nfpm`](https://nfpm.goreleaser.com/) — it builds `.deb`
-  (and `.rpm`) from a YAML manifest on the x86 host, no dpkg toolchain or target
-  needed, which fits the pure-Go cross-compile model. A `make release` / CI step
-  cross-builds + packages.
+Install is a single **`.deb`** built from `packaging/nfpm.yaml` with
+[`nfpm`](https://nfpm.goreleaser.com/) on the x86 host — no dpkg toolchain or
+target hardware, which fits the pure-Go cross-compile model — for the Kali graft
+and stock RaspiOS alike (both Debian Trixie).
 
-Until then, install via the two-service steps above.
+- **Contents:** the three binaries (`czconsole`, `czconsole-lcd`,
+  `czconsole-runtool`), the systemd units (web worker, files-agent, kismet
+  capture, the two cap-class tool-runner templates), the polkit rules, and the
+  JSON tool specs.
+- **`postinstall`:** creates `_czconsole` + the `czconsole` group and the
+  enumerated group memberships, `setcap`s the kismet capture helper, lays down the
+  state + `~/<tool>` output dirs (with the traverse-ACL), `daemon-reload`, enables
+  + starts the services. **`preremove`/`postremove`** stop, disable, and clean up.
+- **Depends:** `acl`, `rtl-sdr`, `rtl-433`, `tcpdump`; tools self-disable when an
+  optional binary (kismet, nmap, gobuster, …) is absent.
 
 ## Security model — privilege separation (north-star)
 

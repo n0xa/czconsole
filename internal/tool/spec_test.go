@@ -21,8 +21,12 @@ func TestLoadShippedSpecs(t *testing.T) {
 	if nmap.Class != ClassNetRaw {
 		t.Errorf("nmap class = %q, want %q", nmap.Class, ClassNetRaw)
 	}
-	if len(nmap.Inputs) != 1 || nmap.Inputs[0].ID != "opts" {
+	if len(nmap.Inputs) < 1 || nmap.Inputs[0].ID != "opts" {
 		t.Errorf("nmap inputs = %+v", nmap.Inputs)
+	}
+	// the syntax-hint note (not a real field) renders but collects no value
+	if nmap.Inputs[len(nmap.Inputs)-1].Type != "note" {
+		t.Errorf("nmap last input should be a note, got %+v", nmap.Inputs[len(nmap.Inputs)-1])
 	}
 	if nmap.Results.Kind != "text" || nmap.Results.File != ".nmap" || nmap.Results.StripPrefix != "#" {
 		t.Errorf("nmap results = %+v", nmap.Results)

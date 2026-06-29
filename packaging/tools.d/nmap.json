@@ -6,7 +6,8 @@
   "class": "netraw",
   "inputs": [
     { "id": "opts", "label": "OPTIONS", "type": "text", "default": "",
-      "placeholder": "-sS -p 1-1000 10.0.0.0/24", "required": true }
+      "placeholder": "-sS -p 1-1000 10.0.0.0/24", "required": true },
+    { "type": "note", "text": "-sS/-sT/-sA   SYN / Connect / ACK\n-sn           ping sweep\n-Pn -O -p 1-1000,22   10.0.0.0/24" }
   ],
   "command": {
     "argv": ["nmap", "--privileged", "-oA", "{{outfile}}", "{{opts...}}"]

@@ -35,6 +35,18 @@ depends:
   - rtl-sdr          # rtl_power / rtl_test / librtlsdr — the SDR sweep + heatmap tool
   - rtl-433          # rtl_433 — the ISM-band decoder (Wireless group)
   - tcpdump          # packet capture (Net Recon)
+  - nmap             # host/port discovery (Net Recon)
+  - gobuster         # dir/DNS busting (Net Recon)
+  # All of the above are in Debian Trixie main, so a hard depends is safe on both
+  # the Kali graft and stock RaspiOS arm64.
+
+recommends:
+  # Wardrive-only deps. Kept optional so the .deb installs on stock RaspiOS, where
+  # kismet isn't in Debian (add kismetwireless.net's repo). The wardrive module
+  # self-disables when these are absent.
+  - kismet           # wardrive capture engine (Kali repo / kismet's own apt repo)
+  - gpsd             # GPS daemon the wardrive (and kismet) read for coordinates
+  - gpsd-clients     # provides gpspipe, used for the GPS feed
 
 contents:
   - src: ./czconsole

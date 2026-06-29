@@ -62,6 +62,9 @@ function renderTool(spec) {
   $('title').textContent = spec.name.toUpperCase();
 
   const inputs = (spec.inputs || []).map(inp => {
+    if (inp.type === 'note') {
+      return `<pre class="note">${esc(inp.text || '')}</pre>`;
+    }
     if (inp.type === 'checkbox') {
       return `<div class="check-row"><input type="checkbox" id="in-${inp.id}" ${inp.default === '1' ? 'checked' : ''}>
               <label for="in-${inp.id}">${inp.label}</label></div>`;
@@ -105,6 +108,7 @@ function renderTool(spec) {
 function values(spec) {
   const v = {};
   for (const inp of spec.inputs || []) {
+    if (inp.type === 'note') continue;
     const el = $(`in-${inp.id}`);
     v[inp.id] = inp.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
   }
@@ -115,7 +119,7 @@ function setMsg(t, err) { const e = $('msg'); if (e) { e.textContent = t; e.clas
 async function start(spec) {
   // required-field check
   for (const inp of spec.inputs || []) {
-    if (inp.required && inp.type !== 'checkbox' && !$(`in-${inp.id}`).value.trim()) {
+    if (inp.required && inp.type !== 'checkbox' && inp.type !== 'note' && !$(`in-${inp.id}`).value.trim()) {
       return setMsg(inp.label + ' required', true);
     }
   }

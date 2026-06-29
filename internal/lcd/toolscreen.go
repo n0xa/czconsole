@@ -56,18 +56,29 @@ func NewToolScreen(spec tool.Spec) *ToolScreen {
 	s := &ToolScreen{spec: spec, runner: tool.NewRunner(spec), runDix: 1, stop: make(chan struct{})}
 	for _, in := range spec.Inputs {
 		f := &toolField{in: in}
-		if in.Type == "checkbox" {
+		switch in.Type {
+		case "note":
+			// static text, not a field — no widget
+		case "checkbox":
 			f.on = in.Default == "1"
-		} else {
+		default:
 			f.tf = newTextField(in.Default)
 		}
 		s.fields = append(s.fields, f)
+	}
+	for i, f := range s.fields { // start focus on the first real field, not a note
+		if !f.isNote() {
+			s.focus = i
+			break
+		}
 	}
 	s.colors = compileColors(spec)
 	s.refresh()
 	go s.poll()
 	return s
 }
+
+func (f *toolField) isNote() bool { return f.in.Type == "note" }
 
 func (s *ToolScreen) poll() {
 	t := time.NewTicker(2 * time.Second)
@@ -153,12 +164,26 @@ func (s *ToolScreen) drawRunning(c *Canvas) {
 	subj := s.subject
 	s.mu.Unlock()
 	if s.spec.Running.Controls == tool.ControlsStop {
-		drawRunningView(c, s.title(), s.spec.Running.Label, subj, "esc leaves it running",
-			[]string{"Stop"}, 0)
+		drawRunningView(c, s.title(), "tab:logs  ent:stop  esc:bg", s.spec.Running.Label, subj,
+			"esc leaves it running", []string{"Stop"}, 0)
 		return
 	}
-	drawRunningView(c, s.title(), s.spec.Running.Label, subj, "results will show when complete",
-		[]string{"Cancel", "Background"}, s.runDix)
+	drawRunningView(c, s.title(), "tab:logs  z/c:move  ent:ok  esc:bg", s.spec.Running.Label, subj,
+		"results will show when complete", []string{"Cancel", "Background"}, s.runDix)
+}
+
+// config-form metrics: inputs are a fixed row; a note is its line count.
+const (
+	cfgRowH    = 34
+	cfgNoteLn  = 13
+	cfgNotePad = 6
+)
+
+func (s *ToolScreen) fieldHeight(f *toolField) int {
+	if f.isNote() {
+		return (strings.Count(f.in.Text, "\n")+1)*cfgNoteLn + cfgNotePad
+	}
+	return cfgRowH
 }
 
 func (s *ToolScreen) drawConfig(c *Canvas) {
@@ -170,24 +195,43 @@ func (s *ToolScreen) drawConfig(c *Canvas) {
 	x0 := content.Min.X + 6
 	small := c.Faces().Small
 
-	const rowH = 34
-	visible := content.Dy() / rowH
-	if visible < 1 {
-		visible = 1
-	}
+	// Variable-height layout (notes can be multi-line): scroll by field index so
+	// the focused field — always a real input, never a note — stays fully visible.
 	if s.focus < s.scroll {
 		s.scroll = s.focus
 	}
-	if s.focus >= s.scroll+visible {
-		s.scroll = s.focus - visible + 1
+	for s.scroll < s.focus {
+		h, fits := 0, true
+		for i := s.scroll; i <= s.focus; i++ {
+			if h += s.fieldHeight(s.fields[i]); h > content.Dy() {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			break
+		}
+		s.scroll++
 	}
-	for i := s.scroll; i < len(s.fields) && i < s.scroll+visible; i++ {
+
+	y := content.Min.Y
+	for i := s.scroll; i < len(s.fields); i++ {
 		f := s.fields[i]
-		y := content.Min.Y + (i-s.scroll)*rowH
-		if f.tf != nil {
+		h := s.fieldHeight(f)
+		if y+h > content.Max.Y && y > content.Min.Y {
+			break
+		}
+		switch {
+		case f.isNote():
+			ly := y + 2
+			for _, line := range strings.Split(f.in.Text, "\n") {
+				c.Text(x0, ly, line, small, colDim)
+				ly += cfgNoteLn
+			}
+		case f.tf != nil:
 			c.Text(x0, y+2, f.in.Label, small, colDim)
 			f.tf.draw(c, image.Rect(x0, y+14, content.Max.X-6, y+32), s.focus == i)
-		} else {
+		default:
 			mark := "[ ] " + f.in.Label
 			if f.on {
 				mark = "[x] " + f.in.Label
@@ -200,6 +244,7 @@ func (s *ToolScreen) drawConfig(c *Canvas) {
 				c.Text(x0+2, y+10, mark, small, colText)
 			}
 		}
+		y += h
 	}
 }
 
@@ -232,6 +277,11 @@ func (s *ToolScreen) Key(ev Event) (Action, Screen) {
 }
 
 func (s *ToolScreen) keyRunning(ev Event) (Action, Screen) {
+	// Tab leaves the job running and opens its logs — same as Tab on the results
+	// page, and consistent with esc's "leave it running" backgrounding.
+	if ev.Key == KeyTab {
+		return ActPush, NewHistory(s.spec)
+	}
 	if s.spec.Running.Controls == tool.ControlsStop {
 		switch ev.Key {
 		case KeyEnter:
@@ -245,7 +295,7 @@ func (s *ToolScreen) keyRunning(ev Event) (Action, Screen) {
 	switch {
 	case ev.Key == KeyBack:
 		return ActPop, nil // background
-	case ev.Key == KeyTab, ev.Key == KeyLeft, ev.Key == KeyRight:
+	case ev.Key == KeyLeft, ev.Key == KeyRight:
 		s.runDix ^= 1
 	case ev.Key == KeyEnter:
 		if s.runDix == 0 {
@@ -263,9 +313,9 @@ func (s *ToolScreen) keyConfig(ev Event) (Action, Screen) {
 	case ev.Key == KeyBack:
 		return ActPop, nil
 	case ev.Key == KeyTab, ev.Rune == 0 && ev.Key == KeyDown:
-		s.focus = (s.focus + 1) % len(s.fields)
+		s.moveFocus(1)
 	case ev.Rune == 0 && ev.Key == KeyUp:
-		s.focus = (s.focus - 1 + len(s.fields)) % len(s.fields)
+		s.moveFocus(-1)
 	case ev.Key == KeyEnter:
 		s.submit()
 	default:
@@ -282,9 +332,26 @@ func (s *ToolScreen) keyConfig(ev Event) (Action, Screen) {
 	return ActNone, nil
 }
 
+// moveFocus advances focus by delta, skipping notes (which aren't focusable).
+func (s *ToolScreen) moveFocus(delta int) {
+	n := len(s.fields)
+	if n == 0 {
+		return
+	}
+	for k := 0; k < n; k++ {
+		s.focus = (s.focus + delta + n) % n
+		if !s.fields[s.focus].isNote() {
+			return
+		}
+	}
+}
+
 func (s *ToolScreen) submit() {
 	vals := map[string]string{}
 	for _, f := range s.fields {
+		if f.isNote() {
+			continue
+		}
 		if f.tf != nil {
 			v := f.tf.String()
 			if f.in.Required && strings.TrimSpace(v) == "" {

@@ -7,8 +7,9 @@
 //     against being started under the wrong unit),
 //  3. reads the worker-supplied input VALUES from /run/czconsole/<id>.json,
 //  4. substitutes them into the spec's argv and runs it — as an argv array via
-//     exec, NEVER a shell, so values cannot inject — capturing stdout+stderr to
-//     ~/<id>/<id>-<ts>.stdout (tools that write their own files use {{outfile}}),
+//     exec, NEVER a shell, so values cannot inject — capturing the combined
+//     stdout+stderr to ~/<id>/<id>-<ts>.output (tools that write their own files
+//     use {{outfile}}),
 //  5. runs an optional post step (e.g. rtl_power's heatmap), gated on an input.
 //
 // The worker only ever supplies the tool id + input values; the binary and arg
@@ -63,17 +64,17 @@ func main() {
 	if len(argv) == 0 {
 		die("empty command for %q", id)
 	}
-	code := run(argv, outfile+".stdout", false)
+	code := run(argv, outfile+".output", false)
 
 	if spec.Post != nil && (spec.Post.When == "" || vals[spec.Post.When] == "1") {
 		if pargv := tool.Substitute(spec.Post.Argv, vals, outfile); len(pargv) > 0 {
-			run(pargv, outfile+".stdout", true)
+			run(pargv, outfile+".output", true)
 		}
 	}
 	os.Exit(code)
 }
 
-// run executes argv, sending stdout+stderr to outpath. Returns the exit code.
+// run executes argv, sending combined stdout+stderr to outpath. Returns the exit code.
 func run(argv []string, outpath string, appnd bool) int {
 	flag := os.O_CREATE | os.O_WRONLY
 	if appnd {
