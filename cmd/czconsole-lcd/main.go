@@ -38,6 +38,10 @@ func main() {
 	default:
 		if p, ok := strings.CutPrefix(v, "image:"); ok {
 			root = lcd.NewImageView(p)
+		} else if p, ok := strings.CutPrefix(v, "history:"); ok {
+			if sp, err := tool.LoadByID(p); err == nil {
+				root = lcd.NewHistory(sp)
+			}
 		} else if sp, err := tool.LoadByID(v); err == nil {
 			root = lcd.NewToolScreen(sp)
 		}

@@ -2,9 +2,6 @@ package lcd
 
 import (
 	"image"
-	"image/color"
-	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -55,11 +52,6 @@ type toolField struct {
 	on bool       // checkbox state
 }
 
-type colorRule struct {
-	re  *regexp.Regexp
-	col color.Color
-}
-
 func NewToolScreen(spec tool.Spec) *ToolScreen {
 	s := &ToolScreen{spec: spec, runner: tool.NewRunner(spec), runDix: 1, stop: make(chan struct{})}
 	for _, in := range spec.Inputs {
@@ -71,11 +63,7 @@ func NewToolScreen(spec tool.Spec) *ToolScreen {
 		}
 		s.fields = append(s.fields, f)
 	}
-	for _, cr := range spec.Results.Colorize {
-		if re, err := regexp.Compile(cr.Match); err == nil {
-			s.colors = append(s.colors, colorRule{re, namedColor(cr.Color)})
-		}
-	}
+	s.colors = compileColors(spec)
 	s.refresh()
 	go s.poll()
 	return s
@@ -101,17 +89,13 @@ func (s *ToolScreen) refresh() {
 	if running || latest != "" {
 		subj = s.runner.Subject()
 	}
-	// kind=image: look for the sibling image (e.g. <run>.png next to <run>.csv).
 	var imagePath string
-	if s.spec.Results.Kind == "image" && latest != "" && s.spec.Results.Image != "" {
-		ip := strings.TrimSuffix(latest, s.spec.Results.File) + s.spec.Results.Image
-		if _, err := os.Stat(ip); err == nil {
-			imagePath = ip
-		}
+	if latest != "" {
+		imagePath = imageSibling(s.spec, latest)
 	}
 	var lines []Line
 	if !running && latest != "" {
-		lines = s.buildResultLines(latest, when, subj, imagePath)
+		lines = resultLines(s.spec, latest, when, subj, imagePath, s.colors)
 	}
 	s.mu.Lock()
 	s.running, s.latest, s.when, s.subject, s.lines, s.imagePath = running, latest, when, subj, lines, imagePath
@@ -150,11 +134,11 @@ func (s *ToolScreen) Draw(c *Canvas) {
 	lines := s.lines
 	hasImage := s.imagePath != ""
 	s.mu.Unlock()
-	footer := "esc:config"
+	footer := "tab:logs  esc:config"
 	if hasImage {
-		footer = "ent:view  esc:config"
+		footer = "ent:view  tab:logs  esc:config"
 	} else if len(lines) > 0 {
-		footer = "f/x:scroll  z/c:pan  esc:config"
+		footer = "f/x:scroll  tab:logs  esc:config"
 	}
 	content := drawChrome(c, s.title(), footer)
 	if len(lines) > 0 {
@@ -231,6 +215,9 @@ func (s *ToolScreen) Key(ev Event) (Action, Screen) {
 	if ev.Key == KeyBack {
 		s.mode = toolConfig
 		return ActNone, nil
+	}
+	if ev.Key == KeyTab {
+		return ActPush, NewHistory(s.spec)
 	}
 	if ev.Key == KeyEnter {
 		s.mu.Lock()
@@ -338,65 +325,4 @@ func (s *ToolScreen) setErr(e string) {
 	s.mu.Lock()
 	s.err = e
 	s.mu.Unlock()
-}
-
-// ── results rendering (text/path + strip + colorize) ─────────────────────────
-
-func (s *ToolScreen) buildResultLines(path string, when time.Time, subj, imagePath string) []Line {
-	var lines []Line
-	if subj != "" {
-		lines = append(lines, Line{subj, colText})
-	}
-	if !when.IsZero() {
-		lines = append(lines, Line{when.Format("2006-01-02 15:04:05"), colDim})
-	}
-	if s.spec.Results.Kind == "image" {
-		if imagePath != "" {
-			return append(lines, Line{"heatmap ready — press ent to view", colAccent})
-		}
-		// no image this run → fall back to the primary output's path
-		return append(lines, Line{"no heatmap for this run", colDim},
-			Line{"saved to:", colDim}, Line{path, colDim})
-	}
-	if s.spec.Results.Kind == "path" {
-		return append(lines, Line{"saved to:", colDim}, Line{path, colAccent})
-	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return append(lines, Line{"(output unavailable)", colDim})
-	}
-	sp := s.spec.Results.StripPrefix
-	for _, raw := range strings.Split(string(b), "\n") {
-		ln := strings.TrimRight(raw, "\r")
-		if strings.TrimSpace(ln) == "" {
-			continue
-		}
-		if sp != "" && strings.HasPrefix(strings.TrimSpace(ln), sp) {
-			continue
-		}
-		lines = append(lines, Line{ln, s.colorFor(ln)})
-	}
-	return lines
-}
-
-func (s *ToolScreen) colorFor(line string) color.Color {
-	for _, cr := range s.colors {
-		if cr.re.MatchString(line) {
-			return cr.col
-		}
-	}
-	return colText
-}
-
-func namedColor(name string) color.Color {
-	switch name {
-	case "accent":
-		return colAccent
-	case "dim":
-		return colDim
-	case "title":
-		return colTitle
-	default:
-		return colText
-	}
 }

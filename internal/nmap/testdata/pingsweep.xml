@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<nmaprun scanner="nmap" args="nmap -sn -oA p 192.168.1.0/24" start="1700000000">
-<host><status state="up" reason="arp-response"/><address addr="192.168.1.1" addrtype="ipv4"/></host>
-<host><status state="up" reason="arp-response"/><address addr="192.168.1.50" addrtype="ipv4"/></host>
-<host><status state="up" reason="arp-response"/><address addr="192.168.1.112" addrtype="ipv4"/></host>
-<runstats><finished time="1700000005" elapsed="2.0"/><hosts up="3" down="0" total="3"/></runstats>
-</nmaprun>

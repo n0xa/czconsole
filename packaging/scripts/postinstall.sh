@@ -44,8 +44,7 @@ usermod -aG czconsole,kismet "$OP" 2>/dev/null || true
 # (czconsole.service + the kismet unit only carry /home/kali in their wardrive
 # bind/-p paths; the User=kali sed is a no-op for them.)
 if [ "$OP" != kali ]; then
-  for svc in czconsole-files.service czconsole-rtlpower.service czconsole-rtl433.service \
-             czconsole-nmap.service czconsole.service czconsole-kismet@.service \
+  for svc in czconsole-files.service czconsole.service czconsole-kismet@.service \
              czconsole-tool@.service czconsole-tool-netraw@.service; do
     [ -f /etc/systemd/system/"$svc" ] && \
       sed -i "s/^User=kali\$/User=$OP/; s#/home/kali#/home/$OP#" \
@@ -88,17 +87,16 @@ else
   echo "warn: curl not found — install rfheatmap manually to /usr/local/bin/rfheatmap"
 fi
 
-# SDR wrapper scripts — installed from the .deb contents block.
-# /usr/local/lib/czconsole/ already contains them; just ensure the dir exists.
+# /usr/local/lib/czconsole/ holds the APPLaunch assets installed above.
 install -d /usr/local/lib/czconsole
 
 # State + config dirs.
-install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole /var/lib/czconsole/wardrive /var/lib/czconsole/sdr
+install -d -o _czconsole -g _czconsole -m 0750 /var/lib/czconsole /var/lib/czconsole/wardrive
 install -d -m 0755 /etc/czconsole/modules.d
 
 # ── Tool-output dirs in the operator's home (the shared recon-tool convention) ─
 # Every capture/recon tool writes timestamped files under ~/<tool>/ so they're
-# browsable via the Files module next to ~/SDR. Each dir is setgid to the shared
+# browsable via the Files module. Each dir is setgid to the shared
 # 'czconsole' group + group-writable (2775): the tool (kismet as _czconsole;
 # nmap as the operator) writes captures the operator owns, and — crucially — the
 # group-czconsole ownership makes them readable by the deprivileged frontends.

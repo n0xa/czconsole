@@ -70,13 +70,6 @@ contents:
   - src: ./packaging/czconsole-hdmi-disable.service
     dst: /etc/systemd/system/czconsole-hdmi-disable.service
 
-  - src: ./packaging/czconsole-rtlpower.service
-    dst: /etc/systemd/system/czconsole-rtlpower.service
-  - src: ./packaging/czconsole-rtl433.service
-    dst: /etc/systemd/system/czconsole-rtl433.service
-  - src: ./packaging/czconsole-nmap.service
-    dst: /etc/systemd/system/czconsole-nmap.service
-
   # Generic cap-class tool-runner units (JSON tool framework). Instantiated
   # per tool id by the worker via polkit: czconsole-tool@<id> (no caps) and
   # czconsole-tool-netraw@<id> (CAP_NET_RAW).
@@ -89,10 +82,6 @@ contents:
     dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
   - src: ./packaging/55-czconsole-hdmi.rules
     dst: /etc/polkit-1/rules.d/55-czconsole-hdmi.rules
-  - src: ./packaging/52-czconsole-sdr.rules
-    dst: /etc/polkit-1/rules.d/52-czconsole-sdr.rules
-  - src: ./packaging/53-czconsole-nmap.rules
-    dst: /etc/polkit-1/rules.d/53-czconsole-nmap.rules
   - src: ./packaging/56-czconsole-tool.rules
     dst: /etc/polkit-1/rules.d/56-czconsole-tool.rules
 
@@ -109,18 +98,6 @@ contents:
   - src: ./packaging/tools.d/rtl_power.json
     dst: /etc/czconsole/tools.d/rtl_power.json
 
-  - src: ./packaging/sdr-rtlpower
-    dst: /usr/local/lib/czconsole/sdr-rtlpower
-    file_info:
-      mode: 0755
-  - src: ./packaging/sdr-rtl433
-    dst: /usr/local/lib/czconsole/sdr-rtl433
-    file_info:
-      mode: 0755
-  - src: ./packaging/recon-nmap
-    dst: /usr/local/lib/czconsole/recon-nmap
-    file_info:
-      mode: 0755
   - src: ./packaging/tmpfiles-czconsole.conf
     dst: /usr/lib/tmpfiles.d/czconsole.conf
 

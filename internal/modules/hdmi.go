@@ -78,6 +78,7 @@ func dmEnabled() bool {
 //	stopped  → grey   (deliberately off: inactive AND not enabled)
 //	degraded → red    (enabled / should be up, but no live processes — e.g. the
 //	                   OOM killer took it, or it failed to start)
+//
 // computeState is the single source of truth for HDMI run-state, shared by the
 // detail endpoint and the dashboard tile so they can't drift. Fork-free:
 // active=cgroup read (mechanics), enabled=boot symlink (persisted intent).

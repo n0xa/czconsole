@@ -17,8 +17,11 @@
              "-F", "json:{{outfile}}.json", "-F", "kv:{{outfile}}.txt"]
   },
   "results": {
-    "kind": "path",
-    "file": ".txt"
+    "kind": "text",
+    "file": ".txt",
+    "colorize": [
+      { "match": "model", "color": "accent" }
+    ]
   },
   "running": {
     "label": "SCANNING…",

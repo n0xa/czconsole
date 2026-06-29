@@ -3,9 +3,10 @@
 // routes under /m/<id>/, and exposes a uniform Manifest the dashboard renders.
 //
 // A module is a Go value implementing Module. Bundled modules ship in the
-// binary (Files is fully implemented; the recon/SDR/wardrive tiles are
-// placeholders until their real modules land). External manifest modules
-// (modules-dir) are discovered at Load time — schema finalized with wardrive.
+// binary: Files (operator-home browser, proxied to the files-agent), HDMI, and
+// Wardrive are bespoke; the recon/SDR tools are generic spec-driven group
+// modules (Net Recon, Wireless) built from /etc/czconsole/tools.d. External
+// manifest modules (modules-dir) are discovered at Load time.
 package modules
 
 import (
@@ -59,6 +60,10 @@ type Manifest struct {
 	Missing   []string    `json:"missing,omitempty"`
 	Source    string      `json:"source"`
 	Status    *TileStatus `json:"status,omitempty"` // live run-state, set by Describe for StatusProviders
+
+	// Group, if set, nests this module inside a tool group's page (e.g. Wardrive
+	// → "Wireless") instead of giving it a top-level dashboard tile. Still mounted.
+	Group string `json:"group,omitempty"`
 }
 
 type Requires struct {
@@ -82,16 +87,30 @@ type Registry struct {
 // of the files-agent process (the worker proxies Files to it, since the
 // unprivileged worker can't write the operator's home itself).
 func NewRegistry(dir, filesSock string) *Registry {
-	return &Registry{
-		dir: dir,
-		mods: []Module{
-			NewFilesProxy(filesSock),
-			NewWardriveModule(),
-			NewHDMIModule(),
-			NewSDRModule(),
-			NewNmapModule(),
-		},
+	bespoke := []Module{
+		NewFilesProxy(filesSock),
+		NewWardriveModule(),
+		NewHDMIModule(),
 	}
+	// The recon/SDR tools are spec-driven group modules (Net Recon, Wireless),
+	// built from /etc/czconsole/tools.d — same specs the LCD uses. (Replaces the
+	// old per-tool nmap/sdr web modules.)
+	groups := ToolGroups()
+	// Nest grouped bespoke modules (e.g. Wardrive → Wireless) as link cards on
+	// their group's page, mirroring how the LCD menu appends Wardrive to Wireless.
+	for _, b := range bespoke {
+		man := b.Manifest()
+		if man.Group == "" {
+			continue
+		}
+		avail, _ := resolve(man.Requires)
+		for _, g := range groups {
+			if tg, ok := g.(*toolGroup); ok && tg.name == man.Group {
+				tg.extras = append(tg.extras, extraLink{Name: man.Name, ID: man.ID, Icon: man.Icon, Available: avail})
+			}
+		}
+	}
+	return &Registry{dir: dir, mods: append(bespoke, groups...)}
 }
 
 // Load scans modules-dir for external manifest modules. (Parsing lands with the
@@ -109,6 +128,9 @@ func (r *Registry) Describe() []Manifest {
 	out := make([]Manifest, 0, len(r.mods))
 	for _, m := range r.mods {
 		man := m.Manifest()
+		if man.Group != "" {
+			continue // nested inside its group's page, not a top-level tile
+		}
 		man.Available, man.Missing = resolve(man.Requires)
 		// Live run-state for the tile, only for available StatusProviders (no
 		// point computing it for a module whose deps are missing). Fork-free.
@@ -159,31 +181,12 @@ func resolve(req Requires) (ok bool, missing []string) {
 	return
 }
 
-// ── Placeholder manifests for not-yet-built modules (dashboard tiles only) ──
-
 func wardriveManifest() Manifest {
 	return Manifest{
 		ID: "wardrive", Name: "Wardrive", Icon: "radar",
 		Description: "Kismet + GPS site survey with WiGLE/KML export",
 		Requires:    Requires{Binaries: []string{"kismet", "gpspipe"}, AnyInterface: "monitor"},
 		Source:      "bundled",
-	}
-}
-
-func sdrManifest() Manifest {
-	return Manifest{
-		ID: "sdr", Name: "SDR Sweep", Icon: "wave",
-		Description: "rtl_power spectrum sweep + rtl_433 ISM decoder",
-		Requires:    Requires{Binaries: []string{"rtl_power", "rtl_433", "rfheatmap"}},
-		Source:      "bundled",
-	}
-}
-
-func netreconManifest() Manifest {
-	return Manifest{
-		ID: "netrecon", Name: "Net Recon", Icon: "crosshair",
-		Description: "nmap host/port discovery on the connected network",
-		Requires:    Requires{Binaries: []string{"nmap"}},
-		Source:      "bundled",
+		Group:       "Wireless", // nested in the Wireless group page (mirrors the LCD menu)
 	}
 }

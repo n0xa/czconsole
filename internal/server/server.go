@@ -302,7 +302,7 @@ const loginHTML = `<!doctype html>
 <style>
 :root{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;
+body{margin:0;min-height:100vh;display:grid;place-items:start center;padding:8vh 16px 24px;
   background:#0c0d10;color:#e6e7ea;font:16px/1.4 system-ui,-apple-system,sans-serif}
 .card{width:min(92vw,340px);background:#16181d;border:1px solid #23262d;
   border-radius:16px;padding:28px 24px;box-shadow:0 8px 40px #0008}

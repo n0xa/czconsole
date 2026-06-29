@@ -37,7 +37,7 @@
 </head>
 <body>
   <header class="appbar">
-    <a class="back" href="/" style="color:var(--dim);text-decoration:none;font-size:18px">‹</a>
+    <a class="back" href="/" onclick="if(history.length>1){history.back();return false}" style="color:var(--dim);text-decoration:none;font-size:18px">‹</a>
     <h1>WARDRIVE</h1>
     <span id="gps" class="pill">GPS —</span>
   </header>
