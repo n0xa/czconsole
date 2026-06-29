@@ -45,8 +45,8 @@ usermod -aG czconsole,kismet "$OP" 2>/dev/null || true
 # bind/-p paths; the User=kali sed is a no-op for them.)
 if [ "$OP" != kali ]; then
   for svc in czconsole-files.service czconsole-rtlpower.service czconsole-rtl433.service \
-             czconsole-nmap.service czconsole-gobuster.service czconsole.service \
-             czconsole-kismet@.service; do
+             czconsole-nmap.service czconsole.service czconsole-kismet@.service \
+             czconsole-tool@.service czconsole-tool-netraw@.service; do
     [ -f /etc/systemd/system/"$svc" ] && \
       sed -i "s/^User=kali\$/User=$OP/; s#/home/kali#/home/$OP#" \
         /etc/systemd/system/"$svc"
@@ -108,6 +108,9 @@ if [ -d "/home/$OP" ]; then
   install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/Wardriving"
   install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/nmap"
   install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/gobuster"
+  install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/tcpdump"
+  install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/rtl_433"
+  install -d -o "$OP" -g czconsole -m 2775 "/home/$OP/rtl_power"
 
   # ── Why this ACL exists (read before "fixing" it) ───────────────────────────
   # Two deprivileged consumers read these tool dirs, and they reach them by

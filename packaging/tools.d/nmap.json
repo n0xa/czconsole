@@ -1,0 +1,28 @@
+{
+  "id": "nmap",
+  "name": "nmap",
+  "group": "Net Recon",
+  "binary": "nmap",
+  "class": "netraw",
+  "inputs": [
+    { "id": "opts", "label": "OPTIONS", "type": "text", "default": "",
+      "placeholder": "-sS -p 1-1000 10.0.0.0/24", "required": true }
+  ],
+  "command": {
+    "argv": ["nmap", "--privileged", "-oA", "{{outfile}}", "{{opts...}}"]
+  },
+  "results": {
+    "kind": "text",
+    "file": ".nmap",
+    "strip_prefix": "#",
+    "colorize": [
+      { "match": "\\bopen\\b", "color": "accent" },
+      { "match": "\\bfiltered\\b", "color": "dim" }
+    ]
+  },
+  "running": {
+    "label": "SCANNING…",
+    "subject": "{{opts}}",
+    "controls": "cancel-background"
+  }
+}

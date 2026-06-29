@@ -1,0 +1,37 @@
+[Unit]
+Description=czconsole tool runner (net-raw) — %i
+Documentation=https://github.com/n0xa/czconsole
+After=local-fs.target network-online.target
+# Generic per-tool unit, NET-RAW class: grants CAP_NET_RAW for tools that need
+# raw sockets (nmap SYN scans, tcpdump capture). %i = tool id. czconsole-runtool
+# additionally REFUSES to run if its effective caps exceed the spec's declared
+# class — so a tool mistakenly started here instead of the plain unit won't run
+# over-privileged (defense in depth; see cmd/czconsole-runtool).
+
+[Service]
+Type=simple
+User=kali
+SupplementaryGroups=netdev
+ExecStart=/usr/local/bin/czconsole-runtool %i
+Restart=no
+# A timeout-wrapped tool (e.g. tcpdump/rtl_power with a duration) exits 124 when
+# its timer fires — that's a clean completion, not a failure.
+SuccessExitStatus=124
+
+# Scoped to exactly CAP_NET_RAW (and nothing else); ambient so the tool inherits
+# it across exec. CAP_NET_ADMIN is intentionally NOT here — add a third class if a
+# future tool needs it.
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+NoNewPrivileges=no
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK AF_PACKET
+
+ProtectSystem=strict
+ProtectHome=no
+ReadWritePaths=/home/kali /run/czconsole
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

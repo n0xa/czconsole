@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Key is a logical navigation key, decoded from evdev.
@@ -182,9 +183,30 @@ func findKeypad() string {
 	return "/dev/input/event0"
 }
 
-// ReadKeys opens the keypad and streams press Events (ignoring autorepeat) on the
-// returned channel until ctx is cancelled. Shift is tracked across press/release
-// so letters can be cased; everything else emits on press only.
+// software-autorepeat timing (the tca8418 has no EV_REP, so we generate it).
+const (
+	repeatDelay  = 320 * time.Millisecond // hold this long before repeating
+	repeatPeriod = 45 * time.Millisecond  // then re-emit this often
+)
+
+// repeatable reports whether a held key should auto-repeat. The commit keys are
+// excluded so a hold can't double-submit / over-pop / skip form fields.
+func repeatable(code uint16) bool {
+	switch code {
+	case keyEnter, keyEsc, keyTab:
+		return false
+	}
+	return true
+}
+
+type rawKey struct {
+	code  uint16
+	value int32 // 1=press, 0=release (the device never sends 2=repeat)
+}
+
+// ReadKeys opens the keypad and streams Events until ctx is cancelled. Shift is
+// tracked across press/release for casing; held keys auto-repeat in software
+// (the controller below) so scrolling/panning can be held down.
 func ReadKeys(ctx context.Context) (<-chan Event, error) {
 	dev := findKeypad()
 	f, err := os.Open(dev)
@@ -192,14 +214,16 @@ func ReadKeys(ctx context.Context) (<-chan Event, error) {
 		return nil, err
 	}
 
+	raw := make(chan rawKey, 32)
 	out := make(chan Event, 16)
+
+	// evdev reader → raw (code,value) press/release events.
 	go func() {
-		defer close(out)
+		defer close(raw)
 		defer f.Close()
 		go func() { <-ctx.Done(); f.Close() }() // unblock the blocking Read
 
 		var ev inputEvent
-		var shift bool
 		buf := make([]byte, binary.Size(ev))
 		for {
 			if _, err := readFull(f, buf); err != nil {
@@ -208,25 +232,68 @@ func ReadKeys(ctx context.Context) (<-chan Event, error) {
 			ev.Type = binary.LittleEndian.Uint16(buf[16:18])
 			ev.Code = binary.LittleEndian.Uint16(buf[18:20])
 			ev.Value = int32(binary.LittleEndian.Uint32(buf[20:24]))
-
 			if ev.Type != evKey {
 				continue
 			}
-			if ev.Code == keyLShift || ev.Code == keyRShift {
-				shift = ev.Value != 0 // down/repeat → held, up → released
-				continue
+			select {
+			case raw <- rawKey{ev.Code, ev.Value}:
+			case <-ctx.Done():
+				return
 			}
-			if ev.Value != 1 { // press only (ignore release/autorepeat)
-				continue
-			}
-			e := Event{Key: mapKey(ev.Code), Rune: printableRune(ev.Code, shift)}
-			if e.Key == KeyNone && e.Rune == 0 {
-				continue
-			}
+		}
+	}()
+
+	// controller: shift state + software auto-repeat of the held key.
+	go func() {
+		defer close(out)
+		ticker := time.NewTicker(repeatPeriod)
+		defer ticker.Stop()
+
+		var shift bool
+		var heldCode uint16
+		var heldEvent Event
+		var heldSince time.Time
+
+		emit := func(e Event) {
 			select {
 			case out <- e:
 			case <-ctx.Done():
+			}
+		}
+		for {
+			select {
+			case <-ctx.Done():
 				return
+			case rk, ok := <-raw:
+				if !ok {
+					return
+				}
+				if rk.code == keyLShift || rk.code == keyRShift {
+					shift = rk.value != 0
+					continue
+				}
+				switch rk.value {
+				case 1: // press
+					e := Event{Key: mapKey(rk.code), Rune: printableRune(rk.code, shift)}
+					if e.Key == KeyNone && e.Rune == 0 {
+						heldCode = 0
+						continue
+					}
+					emit(e)
+					if repeatable(rk.code) {
+						heldCode, heldEvent, heldSince = rk.code, e, time.Now()
+					} else {
+						heldCode = 0
+					}
+				case 0: // release
+					if rk.code == heldCode {
+						heldCode = 0
+					}
+				}
+			case now := <-ticker.C:
+				if heldCode != 0 && now.Sub(heldSince) >= repeatDelay {
+					emit(heldEvent)
+				}
 			}
 		}
 	}()

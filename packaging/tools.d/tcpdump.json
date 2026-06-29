@@ -1,0 +1,29 @@
+{
+  "id": "tcpdump",
+  "name": "tcpdump",
+  "group": "Net Recon",
+  "binary": "tcpdump",
+  "class": "netraw",
+  "inputs": [
+    { "id": "iface", "label": "INTERFACE", "type": "text", "default": "any",
+      "required": true, "placeholder": "any / wlan1 / eth0" },
+    { "id": "filter", "label": "BPF FILTER", "type": "text", "default": "",
+      "placeholder": "port 80 or host 10.0.0.1" },
+    { "id": "opts", "label": "OPTIONS", "type": "text", "default": "-p -n" },
+    { "id": "timeout", "label": "TIMEOUT (0 = until stopped)", "type": "text",
+      "default": "0", "required": true, "placeholder": "30  / 5m / 0" }
+  ],
+  "command": {
+    "argv": ["timeout", "{{timeout}}", "tcpdump", "-i", "{{iface}}",
+             "-w", "{{outfile}}.pcap", "{{opts...}}", "{{filter...}}"]
+  },
+  "results": {
+    "kind": "path",
+    "file": ".pcap"
+  },
+  "running": {
+    "label": "CAPTURING…",
+    "subject": "{{iface}}  {{filter}}",
+    "controls": "stop"
+  }
+}

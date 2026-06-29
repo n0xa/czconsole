@@ -16,9 +16,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/n0xa/czconsole/internal/lcd"
+	"github.com/n0xa/czconsole/internal/tool"
 )
 
 func main() {
@@ -27,13 +29,18 @@ func main() {
 
 	// Debug: jump straight to a screen (e.g. CZLCD_START=wardrive) for testing.
 	var root lcd.Screen = lcd.NewMenu()
-	switch os.Getenv("CZLCD_START") {
+	// Debug: jump straight to a screen. CZLCD_START=wardrive, or any tool id
+	// (loads its spec into the generic ToolScreen).
+	switch v := os.Getenv("CZLCD_START"); v {
+	case "":
 	case "wardrive":
 		root = lcd.NewWardrive()
-	case "nmap":
-		root = lcd.NewNmap()
-	case "gobuster":
-		root = lcd.NewGobuster()
+	default:
+		if p, ok := strings.CutPrefix(v, "image:"); ok {
+			root = lcd.NewImageView(p)
+		} else if sp, err := tool.LoadByID(v); err == nil {
+			root = lcd.NewToolScreen(sp)
+		}
 	}
 
 	app, err := lcd.NewApp(root)

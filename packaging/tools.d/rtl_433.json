@@ -1,0 +1,28 @@
+{
+  "id": "rtl_433",
+  "name": "rtl_433",
+  "group": "Wireless",
+  "binary": "rtl_433",
+  "class": "plain",
+  "inputs": [
+    { "id": "freq", "label": "FREQ MHz", "type": "text", "default": "433.92", "required": true },
+    { "id": "bw", "label": "BANDWIDTH kHz", "type": "text", "default": "250" },
+    { "id": "gain", "label": "GAIN (0 = AGC)", "type": "text", "default": "0" },
+    { "id": "duration", "label": "DURATION (0 = until stopped)", "type": "text",
+      "default": "0", "required": true, "placeholder": "300 / 5m / 0" }
+  ],
+  "command": {
+    "argv": ["timeout", "{{duration}}", "rtl_433",
+             "-f", "{{freq}}M", "-g", "{{gain}}", "-s", "{{bw}}k",
+             "-F", "json:{{outfile}}.json", "-F", "kv:{{outfile}}.txt"]
+  },
+  "results": {
+    "kind": "path",
+    "file": ".txt"
+  },
+  "running": {
+    "label": "SCANNING…",
+    "subject": "{{freq}} MHz",
+    "controls": "stop"
+  }
+}

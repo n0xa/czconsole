@@ -1,8 +1,9 @@
 # nfpm config for the czconsole .deb.
 #
 # Build the (pure-Go) binaries, then package:
-#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole     ./cmd/czconsole
-#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole-lcd ./cmd/czconsole-lcd
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole         ./cmd/czconsole
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole-lcd     ./cmd/czconsole-lcd
+#   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o czconsole-runtool ./cmd/czconsole-runtool
 #   nfpm package --packager deb --config packaging/nfpm.yaml --target dist/
 #
 # The package Depends on pamtester so the PAM login layer works the moment it's
@@ -31,6 +32,9 @@ depends:
   - libpam-modules   # pam_unix / pam_faillock / pam_deny (essential, but explicit)
   - acl              # setfacl: grants the LCD's _czconsole group traverse on the
                      # operator home so it can read ~/<tool> output (postinstall)
+  - rtl-sdr          # rtl_power / rtl_test / librtlsdr — the SDR sweep + heatmap tool
+  - rtl-433          # rtl_433 — the ISM-band decoder (Wireless group)
+  - tcpdump          # packet capture (Net Recon)
 
 contents:
   - src: ./czconsole
@@ -42,6 +46,14 @@ contents:
   # APPLaunch tile, registered conditionally by the postinstall).
   - src: ./czconsole-lcd
     dst: /usr/local/bin/czconsole-lcd
+    file_info:
+      mode: 0755
+
+  # Trusted tool runner for the JSON tool framework (Deck #275): reads a tool's
+  # /etc/czconsole/tools.d/<id>.json spec + the worker's /run/czconsole/<id>.json
+  # values and runs it. Invoked only by the czconsole-tool[-netraw]@ units.
+  - src: ./czconsole-runtool
+    dst: /usr/local/bin/czconsole-runtool
     file_info:
       mode: 0755
 
@@ -64,8 +76,14 @@ contents:
     dst: /etc/systemd/system/czconsole-rtl433.service
   - src: ./packaging/czconsole-nmap.service
     dst: /etc/systemd/system/czconsole-nmap.service
-  - src: ./packaging/czconsole-gobuster.service
-    dst: /etc/systemd/system/czconsole-gobuster.service
+
+  # Generic cap-class tool-runner units (JSON tool framework). Instantiated
+  # per tool id by the worker via polkit: czconsole-tool@<id> (no caps) and
+  # czconsole-tool-netraw@<id> (CAP_NET_RAW).
+  - src: ./packaging/czconsole-tool@.service
+    dst: /etc/systemd/system/czconsole-tool@.service
+  - src: ./packaging/czconsole-tool-netraw@.service
+    dst: /etc/systemd/system/czconsole-tool-netraw@.service
 
   - src: ./packaging/50-czconsole-kismet.rules
     dst: /etc/polkit-1/rules.d/50-czconsole-kismet.rules
@@ -75,8 +93,21 @@ contents:
     dst: /etc/polkit-1/rules.d/52-czconsole-sdr.rules
   - src: ./packaging/53-czconsole-nmap.rules
     dst: /etc/polkit-1/rules.d/53-czconsole-nmap.rules
-  - src: ./packaging/54-czconsole-gobuster.rules
-    dst: /etc/polkit-1/rules.d/54-czconsole-gobuster.rules
+  - src: ./packaging/56-czconsole-tool.rules
+    dst: /etc/polkit-1/rules.d/56-czconsole-tool.rules
+
+  # Trusted, root-owned tool specs for the JSON framework (the worker may read
+  # but not write these — the privsep boundary; adding a tool = a root drop-in).
+  - src: ./packaging/tools.d/nmap.json
+    dst: /etc/czconsole/tools.d/nmap.json
+  - src: ./packaging/tools.d/gobuster.json
+    dst: /etc/czconsole/tools.d/gobuster.json
+  - src: ./packaging/tools.d/tcpdump.json
+    dst: /etc/czconsole/tools.d/tcpdump.json
+  - src: ./packaging/tools.d/rtl_433.json
+    dst: /etc/czconsole/tools.d/rtl_433.json
+  - src: ./packaging/tools.d/rtl_power.json
+    dst: /etc/czconsole/tools.d/rtl_power.json
 
   - src: ./packaging/sdr-rtlpower
     dst: /usr/local/lib/czconsole/sdr-rtlpower
@@ -88,10 +119,6 @@ contents:
       mode: 0755
   - src: ./packaging/recon-nmap
     dst: /usr/local/lib/czconsole/recon-nmap
-    file_info:
-      mode: 0755
-  - src: ./packaging/recon-gobuster
-    dst: /usr/local/lib/czconsole/recon-gobuster
     file_info:
       mode: 0755
   - src: ./packaging/tmpfiles-czconsole.conf

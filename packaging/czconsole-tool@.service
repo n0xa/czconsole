@@ -1,0 +1,38 @@
+[Unit]
+Description=czconsole tool runner (plain) — %i
+Documentation=https://github.com/n0xa/czconsole
+After=local-fs.target network-online.target
+# Generic per-tool unit for the JSON tool framework (Deck #275). %i = tool id.
+# The PLAIN class: no capabilities (gobuster, rtl_433, rtl_power). czconsole-runtool
+# reads the trusted /etc/czconsole/tools.d/%i.json spec + the worker's input
+# values and runs the command. Started via polkit by the deprivileged worker.
+
+[Service]
+Type=simple
+# Runs as the operator so output lands in ~/<id>/ owned by the human.
+User=kali
+# plugdev/netdev: USB SDR dongle + network device access for the plain-class tools.
+SupplementaryGroups=plugdev netdev
+ExecStart=/usr/local/bin/czconsole-runtool %i
+Restart=no
+# A timeout-wrapped tool (e.g. tcpdump/rtl_power with a duration) exits 124 when
+# its timer fires — that's a clean completion, not a failure.
+SuccessExitStatus=124
+
+# No capabilities. NoNewPrivileges + empty bounding set = least privilege.
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+# AF_NETLINK is required by libusb/libudev to enumerate USB devices — without it
+# the SDR tools (rtl_power/rtl_433) report "No supported devices found" even
+# though the dongle is present and works outside the sandbox.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+ProtectSystem=strict
+ProtectHome=no
+ReadWritePaths=/home/kali /run/czconsole
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -44,7 +44,6 @@ ProtectHome=tmpfs
 # dir not existing yet; the operator path is patched by the postinstall.
 BindReadOnlyPaths=-/home/kali/Wardriving
 BindReadOnlyPaths=-/home/kali/nmap
-BindReadOnlyPaths=-/home/kali/gobuster
 PrivateTmp=yes
 ProtectControlGroups=yes
 ProtectKernelModules=yes

@@ -10,10 +10,41 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/n0xa/czconsole/internal/fb"
+	"github.com/n0xa/czconsole/internal/img"
 	"github.com/n0xa/czconsole/internal/wardrive"
 )
+
+// r565convert converts a PNG to a flat .r565 and reports timing + peak RSS, to
+// validate the streaming converter stays bounded on big images.
+func r565convert(pngPath, outPath string) {
+	start := time.Now()
+	w, h, err := img.PNGToR565(pngPath, outPath, func(f float64) {
+		fmt.Printf("\r  converting %3.0f%%", f*100)
+	})
+	fmt.Println()
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	fi, _ := os.Stat(outPath)
+	fmt.Printf("converted %dx%d in %v → %.0f MB .r565, peak RSS %s\n",
+		w, h, time.Since(start).Round(time.Millisecond), float64(fi.Size())/1e6, vmHWM())
+}
+
+// vmHWM reads the process peak resident set size from /proc/self/status.
+func vmHWM() string {
+	b, _ := os.ReadFile("/proc/self/status")
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, "VmHWM:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "VmHWM:"))
+		}
+	}
+	return "?"
+}
 
 // keyName maps the common evdev codes so the capture is readable; unknown codes
 // (e.g. a Fn/Sym modifier) print as code_NNN so we can identify them.
@@ -93,6 +124,12 @@ func main() {
 			dev = os.Args[2]
 		}
 		dumpKeys(dev)
+	case "r565":
+		if len(os.Args) < 4 {
+			fmt.Println("usage: czdbg r565 <png> <out.r565>")
+			os.Exit(1)
+		}
+		r565convert(os.Args[2], os.Args[3])
 	case "fb":
 		if len(os.Args) < 3 {
 			fmt.Println("usage: czdbg fb <path>")

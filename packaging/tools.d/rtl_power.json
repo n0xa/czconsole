@@ -1,0 +1,38 @@
+{
+  "id": "rtl_power",
+  "name": "RF Heatmap",
+  "group": "Wireless",
+  "binary": "rtl_power",
+  "class": "plain",
+  "inputs": [
+    { "id": "low", "label": "LOW MHz", "type": "text", "default": "450", "required": true },
+    { "id": "high", "label": "HIGH MHz", "type": "text", "default": "470", "required": true },
+    { "id": "bin", "label": "BIN kHz", "type": "text", "default": "5" },
+    { "id": "crop", "label": "CROP (0 - 0.9)", "type": "text", "default": "0.2" },
+    { "id": "gain", "label": "GAIN", "type": "text", "default": "20" },
+    { "id": "integration", "label": "INTEGRATION s", "type": "text", "default": "10" },
+    { "id": "duration", "label": "DURATION s (0 = until stopped)", "type": "text",
+      "default": "30", "required": true },
+    { "id": "heatmap", "label": "Generate heatmap PNG", "type": "checkbox", "default": "1" }
+  ],
+  "command": {
+    "argv": ["timeout", "{{duration}}", "rtl_power",
+             "-f", "{{low}}M:{{high}}M:{{bin}}k",
+             "-g", "{{gain}}", "-c", "{{crop}}", "-i", "{{integration}}",
+             "{{outfile}}.csv"]
+  },
+  "post": {
+    "when": "heatmap",
+    "argv": ["rfheatmap", "-o", "{{outfile}}.png", "{{outfile}}.csv"]
+  },
+  "results": {
+    "kind": "image",
+    "file": ".csv",
+    "image": ".png"
+  },
+  "running": {
+    "label": "SWEEPING…",
+    "subject": "{{low}}-{{high}} MHz",
+    "controls": "stop"
+  }
+}
