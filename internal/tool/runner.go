@@ -74,6 +74,9 @@ func (r *Runner) Start(vals map[string]string) error {
 			_ = os.Chown(r.jobPath(), -1, gid) // _czconsole is in czconsole, so this is permitted
 		}
 	}
+	// Force the mode: the worker runs with a restrictive umask (UMask=0077), which
+	// would strip group-read from WriteFile's 0640 down to 0600 — chmod ignores umask.
+	_ = os.Chmod(r.jobPath(), 0o640)
 	if out, err := exec.Command("systemctl", "start", "--no-block", r.Unit()).CombinedOutput(); err != nil {
 		return fmt.Errorf("systemctl start: %v: %s", err, strings.TrimSpace(string(out)))
 	}
