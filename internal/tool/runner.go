@@ -5,13 +5,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/n0xa/czconsole/internal/opdir"
 	"github.com/n0xa/czconsole/internal/unit"
 )
+
+// jobGroup is the shared group between the worker (writes the job file) and the
+// operator (run-tool reads it). The job must be group-readable or run-tool gets
+// an empty value map and every {{input}} resolves to "".
+const jobGroup = "czconsole"
 
 // Runner is the FRONTEND side of a spec (LCD or web): it writes the worker's
 // input values to the job file and starts the matching cap-class unit, checks
@@ -56,8 +63,16 @@ func (r *Runner) Start(vals map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(r.jobPath(), b, 0o600); err != nil {
+	// 0640 + group czconsole: run-tool runs as the operator (User=kali), not
+	// _czconsole, so the job must be readable via the shared group or all input
+	// values are silently dropped (every {{input}} -> "").
+	if err := os.WriteFile(r.jobPath(), b, 0o640); err != nil {
 		return fmt.Errorf("job file: %w", err)
+	}
+	if g, err := user.LookupGroup(jobGroup); err == nil {
+		if gid, e := strconv.Atoi(g.Gid); e == nil {
+			_ = os.Chown(r.jobPath(), -1, gid) // _czconsole is in czconsole, so this is permitted
+		}
 	}
 	if out, err := exec.Command("systemctl", "start", "--no-block", r.Unit()).CombinedOutput(); err != nil {
 		return fmt.Errorf("systemctl start: %v: %s", err, strings.TrimSpace(string(out)))

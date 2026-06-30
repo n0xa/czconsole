@@ -106,7 +106,12 @@ func run(argv []string, outpath string, appnd bool) int {
 func readJob(id string) map[string]string {
 	b, err := os.ReadFile(filepath.Join("/run/czconsole", id+".json"))
 	if err != nil {
-		return map[string]string{}
+		if os.IsNotExist(err) {
+			return map[string]string{} // a tool with no inputs has no job file — fine
+		}
+		// e.g. a permission error: do NOT silently run with empty inputs (every
+		// {{input}} would become ""); fail loudly instead.
+		die("read job %s: %v", id, err)
 	}
 	var vals map[string]string
 	if err := json.Unmarshal(b, &vals); err != nil || vals == nil {
