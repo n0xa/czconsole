@@ -87,7 +87,7 @@ dpkg toolchain or target hardware needed), then install it on the device:
 for c in czconsole czconsole-lcd czconsole-runtool; do
   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o "$c" "./cmd/$c"
 done
-CZCONSOLE_VERSION=0.1.0 nfpm package -f packaging/nfpm.yaml -p deb   # -> czconsole_0.1.0_arm64.deb
+CZCONSOLE_VERSION=$(git describe --tags) nfpm package -f packaging/nfpm.yaml -p deb  # v0.3.4 tag -> czconsole_0.3.4_arm64.deb
 scp czconsole_*_arm64.deb kali@cz:/tmp/
 ssh kali@cz 'sudo apt install -y /tmp/czconsole_*_arm64.deb'
 ```

@@ -14,10 +14,12 @@ name: czconsole
 arch: arm64
 platform: linux
 version: ${CZCONSOLE_VERSION}
-version_schema: none
+version_schema: semver           # tolerates + strips a leading "v" (git describe -> v0.3.4 => 0.3.4)
 section: utils
 priority: optional
-maintainer: n0xa <noxa@example.com>
+# Maintainer email must match the PR author for the CardputerZero/packages
+# validator (n0xa@users.noreply.github.com or the account's public email).
+maintainer: n0xa <n0xa@users.noreply.github.com>
 description: |
   Cardputer Zero field console.
   A phone-friendly web dashboard served by the CZ itself: telemetry, LCD mirror,
